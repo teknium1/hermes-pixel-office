@@ -1,2 +1,4 @@
 __pycache__/
 *.pyc
+relay/node_modules/
+relay/.wrangler/

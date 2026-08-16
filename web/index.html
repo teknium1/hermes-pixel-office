@@ -3,92 +3,967 @@
 <head>
 <meta charset="utf-8">
 <title>Hermes Pixel Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Silkscreen:wght@400;700&family=Pixelify+Sans:wght@400;700&family=DotGothic16&family=Rubik+Pixel&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  html,body{margin:0;height:100%;background:#1a1423;overflow:hidden;
-    font-family:ui-monospace,Menlo,Consolas,monospace}
+  :root{
+    --bg:#1a1423; --panel:#221a2e; --panel2:#241c30; --panelHover:#2a2138;
+    --border:#3a2f4b; --borderDim:#2c2340; --rowMe:#2a2438; --rowCurrent:#33291a;
+    --accent:#e8c170; --text:#cfc4e8; --sub:#7a6f8f; --green:#5fce7a;
+    --dev:#ffd700; --link:#7fa8d8; --linkHover:#a8c8e8; --danger:#d84f6f;
+    --chip:#7fa8d8; --on:#5fce7a;
+    --scroll:#4a3f63; --time:#555;
+    /* canvas / office-scene palette */
+    --cvFloor:#2a2138; --cvFloorAlt:#251d31; --cvWall:#3a2f4b; --cvWallTrim:#241c30;
+    --cvWindow:#151022; --cvWindowGlass:#3b5a8f; --cvWindowGlow:#7fa8d8;
+    --cvDesk:#6b4a2f; --cvDeskDark:#54381f; --cvDeskLeg:#3c2814; --cvMonitor:#191524;
+    --cvScreen:#0f2c1e; --cvPlant:#5fce7a; --cvPlantDark:#4aa860; --cvPot:#8d5524;
+    /* pixel-agent palette (base hues; per-agent variety derived from these) */
+    --agSkin:#f0c8a0; --agShirt:#4fa4d8; --agHair:#2b2b2b;
+    --font:ui-monospace,Menlo,Consolas,monospace; --fs:12px;
+  }
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;
+    font-family:var(--font);font-size:var(--fs)}
   #wrap{display:flex;flex-direction:column;height:100%}
-  #hdr{color:#e8c170;padding:7px 14px;font-size:13px;letter-spacing:1px;
-    border-bottom:2px solid #3a2f4b;display:flex;justify-content:space-between;
-    align-items:center;gap:10px}
-  #hdr .dim{color:#7a6f8f}
-  #hdr .btn{cursor:pointer;color:#cfc4e8;border:1px solid #3a2f4b;
-    border-radius:3px;padding:2px 8px;font-size:12px;background:#241c30;
+  #hdr{color:var(--accent);padding:7px 14px;font-size:1.083em;letter-spacing:1px;
+    border-bottom:2px solid var(--border);display:flex;justify-content:space-between;
+    align-items:center;gap:10px;flex-wrap:wrap}
+  #hdr .dim{color:var(--sub)}
+  #hdr .btn{cursor:pointer;color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:2px 8px;font-size:1em;background:var(--panel2);
     user-select:none}
-  #hdr .btn:hover{border-color:#e8c170;color:#e8c170}
-  #hdr .btn.on{color:#5fce7a;border-color:#5fce7a}
+  #hdr .btn:hover{border-color:var(--accent);color:var(--accent)}
+  #hdr .btn.on{color:var(--on);border-color:var(--on)}
+  /* stats strip — sits left of the "N agents" count, same font */
+  #stats{display:flex;align-items:center;gap:12px;font-size:1em;
+    letter-spacing:0.5px;color:var(--text);white-space:nowrap}
+  #stats .st{display:flex;align-items:center;gap:4px}
+  #stats .st b{color:var(--accent);font-weight:bold}
+  #stats .coin{width:12px;height:12px;image-rendering:pixelated;vertical-align:-2px}
+  #stats .sep{color:var(--border)}
   canvas{flex:1;image-rendering:pixelated;width:100%;height:100%}
+  /* panels */
+  #panel-holder{position:absolute;inset:0;pointer-events:none}
+  .panel{position:absolute;pointer-events:auto;background:var(--panel);border:2px solid var(--border);
+    border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,.5);display:none;flex-direction:column;
+    font-size:1em;z-index:10}
+  .panel.open{display:flex}
+  .panel .ptitle{color:var(--accent);padding:6px 10px;font-size:1em;letter-spacing:1px;
+    border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .panel .pclose{cursor:pointer;color:var(--sub);padding:0 4px}
+  .panel .pclose:hover{color:var(--accent)}
+  /* leaderboard */
+  #lb{right:12px;top:12px;width:max-content;min-width:360px;max-width:94%;max-height:78%;bottom:auto}
+  #lb-list{overflow-y:auto;flex:1;min-height:0}
+  .lb-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;
+    border-bottom:1px solid var(--borderDim);cursor:pointer}
+  .lb-row:hover{background:var(--panelHover)}
+  .lb-row.me{background:var(--rowMe)}
+  .lb-rank{width:22px;color:var(--sub);font-weight:bold;flex-shrink:0}
+  .lb-rank.top{color:var(--accent)}
+  .lb-tier{width:24px;height:24px;image-rendering:pixelated;flex-shrink:0;
+    border:1px solid var(--border);border-radius:3px;background:var(--bg);object-fit:contain}
+  .lb-tiernum{width:30px;color:var(--sub);font-size:.833em;flex-shrink:0;text-align:center}
+  .lb-row.me .lb-tiernum{color:var(--accent)}
+  .lb-name{flex:1 1 6em;min-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    color:var(--text)}
+  .lb-name.dev{color:var(--dev)}
+  .lb-dev{color:var(--dev);font-size:.833em;border:1px solid var(--dev);border-radius:3px;
+    padding:0 4px;margin-left:4px;flex-shrink:0}
+  .lb-stats{margin-left:auto;flex:0 0 auto;display:flex;align-items:baseline;gap:14px;
+    white-space:nowrap}
+  .lb-meta{color:var(--sub);font-size:.833em;flex-shrink:0;text-align:right;white-space:nowrap}
+  .lb-ops{text-align:right;flex-shrink:0;white-space:nowrap}
+  .lb-ops b{color:var(--accent)}
+  .lb-ops .lbl{color:var(--sub);font-size:.833em;display:inline;margin-left:4px}
+  /* model leaderboard (jekyll-hyde correction tallies) */
+  #mb{left:12px;top:12px;width:max-content;min-width:340px;max-width:94%;max-height:78%;bottom:auto}
+  #mb-list{overflow-y:auto;flex:1;min-height:0}
+  .mb-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;
+    border-bottom:1px solid var(--borderDim)}
+  .mb-rank{width:22px;color:var(--sub);font-weight:bold;flex-shrink:0}
+  .mb-rank.top{color:var(--accent)}
+  .mb-name{flex:1 1 8em;min-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    color:var(--text)}
+  .mb-stats{margin-left:auto;flex:0 0 auto;display:flex;align-items:baseline;gap:14px;
+    white-space:nowrap}
+  .mb-break{display:flex;align-items:baseline;gap:7px;flex-shrink:0;white-space:nowrap}
+  .mb-sep{color:var(--border)}
+  .mb-ver{font-size:.75em;color:var(--sub);white-space:nowrap}
+  .mb-ver.sbg{color:#d84f6f}
+  .mb-ver.gen{color:var(--green)}
+  .mb-ver.unc{color:var(--sub)}
+  .mb-corr{text-align:right;flex-shrink:0;white-space:nowrap}
+  .mb-corr b{color:var(--accent)}
+  .mb-corr .lbl{color:var(--sub);font-size:.833em;display:inline;margin-left:4px}
+  .mb-badge{color:var(--green);font-size:.833em;border:1px solid var(--green);border-radius:3px;
+    padding:0 4px;flex-shrink:0}
+  .mb-empty{color:var(--sub);padding:12px;font-size:.833em;text-align:center}
+  .mb-cta{padding:10px 12px;border-top:1px solid var(--borderDim);text-align:center}
+  .mb-cta .ab-link{display:inline-flex;align-items:center;gap:6px;color:var(--accent);
+    background:var(--panel2);padding:6px 10px;border-radius:3px;font-size:.833em}
+  /* profile card */
+  #prof{left:50%;top:50%;transform:translate(-50%,-50%);width:360px;pointer-events:auto;
+    max-height:88%;overflow:auto}
+  .pc-head{display:flex;gap:10px;align-items:center;padding:12px;border-bottom:1px solid var(--border)}
+  .pc-av{width:52px;height:52px;image-rendering:pixelated;border:2px solid var(--border);
+    border-radius:50%;object-fit:cover;flex-shrink:0}
+  .pc-av.gh{background:var(--panel2)}
+  .pc-tierbox{display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;
+    padding:0 2px;border-right:1px solid var(--borderDim)}
+  .pc-tiermax{width:56px;height:56px;image-rendering:pixelated;object-fit:contain}
+  .pc-tiernum{color:var(--sub);font-size:.75em}
+  .pc-name{font-size:1.167em;color:var(--accent);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .pc-name.dev{color:var(--dev)}
+  .pc-devtitle{color:var(--dev);font-size:.75em;font-weight:bold;display:block}
+  .pc-sub{color:var(--sub);font-size:.917em}
+  .pc-bio{color:var(--text);font-size:.917em;padding:8px 12px;border-bottom:1px solid var(--borderDim);
+    white-space:pre-wrap;word-break:break-word}
+  .pc-links{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-bottom:1px solid var(--borderDim)}
+  .pc-link{display:inline-flex;align-items:center;gap:6px;color:var(--text);background:var(--panel2);
+    border:1px solid var(--border);border-radius:3px;padding:3px 8px;text-decoration:none;font-size:.833em}
+  .pc-link:hover{border-color:var(--accent);color:var(--accent)}
+  .pc-link img{width:14px;height:14px;object-fit:contain}
+  .pc-ghlink{display:inline-flex;align-items:center;gap:4px;color:var(--link);
+    text-decoration:none;font-size:.917em;margin-top:3px}
+  .pc-ghlink:hover{color:var(--linkHover);text-decoration:underline}
+  /* On dark profile backgrounds (bg brightness < 50%) the GitHub logo is
+     inverted to white so it stays visible against the profile panel. */
+  #prof.dark-bg .pc-ghlink .gh-icon{fill:#fff}
+  #prof.dark-bg .pc-ghlink{color:#fff}
+  /* The profile's GitHub/Repo link icons are simpleicons.org github in black
+     (181717); on a dark profile bg invert them to white so they don't vanish.
+     Other platform icons keep their own colors. */
+  #prof.dark-bg .pc-link img[src*="simpleicons.org/github/"]{filter:invert(1)}
+  .pc-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px}
+  .pc-stat{background:var(--bg);border:1px solid var(--borderDim);border-radius:3px;padding:6px 8px}
+  .pc-stat .lbl{color:var(--sub);font-size:.833em;letter-spacing:1px}
+  .pc-stat .val{color:var(--text);font-size:1.083em;font-weight:bold}
+  .pc-stat .val.gold{color:var(--accent)}
+  .pc-agents{padding:6px 12px 12px;color:var(--sub);font-size:.917em;border-top:1px solid var(--borderDim)}
+  .pc-agents b{color:var(--text)}
+  .pc-actions{padding:10px 12px;border-top:1px solid var(--borderDim);display:flex;gap:8px;justify-content:flex-end}
+  .pc-editbtn{cursor:pointer;background:var(--panel2);border:1px solid var(--border);color:var(--accent);
+    border-radius:3px;padding:5px 12px;font-family:inherit;font-size:.917em}
+  .pc-editbtn:hover{border-color:var(--accent)}
+  /* chat */
+  #chat{right:12px;bottom:12px;width:320px;height:300px}
+  #chat-list{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+  .cmsg{display:flex;gap:6px;align-items:flex-start}
+  .ctierl{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:26px;margin-top:1px}
+  .ctierl img{width:24px;height:24px;image-rendering:pixelated;border-radius:3px;background:var(--bg);
+    object-fit:contain;border:1px solid var(--borderDim)}
+  .ctierl b{font-size:.67em;color:var(--sub);line-height:1;margin-top:1px}
+  .cav{width:18px;height:18px;image-rendering:pixelated;border-radius:3px;flex-shrink:0;margin-top:2px}
+  .cav.gh{background:var(--panel2)}
+  .cbody{min-width:0}
+  .cuser{color:var(--accent);font-size:.833em;display:flex;align-items:center;gap:4px}
+  .cuser a{color:inherit;text-decoration:none}
+  .cuser a:hover{text-decoration:underline}
+  .ctext{color:var(--text);font-size:.917em;word-break:break-word;margin-top:1px}
+  .ctime{color:var(--time);font-size:.75em}
+  #chat-input-row{display:flex;border-top:1px solid var(--border)}
+  #chat-input{flex:1;background:var(--bg);border:none;color:var(--text);padding:8px 10px;
+    font-family:inherit;font-size:.917em;outline:none}
+  #chat-send{background:var(--panel2);border:none;border-left:1px solid var(--border);
+    color:var(--accent);cursor:pointer;padding:0 12px;font-family:inherit}
+  #chat-send:hover{background:var(--panelHover)}
+  /* scrollable panels: thin, clean scrollbar that appears only on hover */
+  #lb-list,#tier-list,#chat-list,#prof,#edit{scrollbar-width:thin;scrollbar-color:transparent transparent}
+  #lb-list:hover,#tier-list:hover,#chat-list:hover,#prof:hover,#edit:hover{scrollbar-color:var(--scroll) transparent}
+  #lb-list::-webkit-scrollbar,#tier-list::-webkit-scrollbar,#chat-list::-webkit-scrollbar,
+  #prof::-webkit-scrollbar,#edit::-webkit-scrollbar{width:8px}
+  #lb-list::-webkit-scrollbar-track,#tier-list::-webkit-scrollbar-track,#chat-list::-webkit-scrollbar-track,
+  #prof::-webkit-scrollbar-track,#edit::-webkit-scrollbar-track{background:transparent}
+  #lb-list::-webkit-scrollbar-thumb,#tier-list::-webkit-scrollbar-thumb,#chat-list::-webkit-scrollbar-thumb,
+  #prof::-webkit-scrollbar-thumb,#edit::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  #lb-list:hover::-webkit-scrollbar-thumb,#tier-list:hover::-webkit-scrollbar-thumb,
+  #chat-list:hover::-webkit-scrollbar-thumb,#prof:hover::-webkit-scrollbar-thumb,
+  #edit:hover::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  #lb-list::-webkit-scrollbar-thumb:hover,#tier-list::-webkit-scrollbar-thumb:hover,
+  #chat-list::-webkit-scrollbar-thumb:hover,#prof::-webkit-scrollbar-thumb:hover,
+  #edit::-webkit-scrollbar-thumb:hover{background:var(--green);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  /* chat message sound toggle (same icon as the header sound toggle) */
+  #chat .ptitle .csnd{cursor:pointer;color:var(--sub);padding:0 4px;user-select:none;font-size:.917em}
+  #chat .ptitle .csnd:hover{color:var(--accent)}
+  #chat .ptitle .csnd.on{color:var(--on)}
+  /* tier ladder popover */
+  #tiers{left:12px;top:12px;width:300px;max-height:70%}
+  #tier-list{overflow-y:auto;flex:1;min-height:0}
+  .tier-row{display:flex;align-items:center;gap:8px;padding:5px 10px;
+    border-bottom:1px solid var(--borderDim)}
+  .tier-row.locked{opacity:.45}
+  .tier-row.me{background:var(--rowMe)}
+  .tier-row.me.current{background:var(--rowCurrent);border-left:2px solid var(--accent)}
+  .tier-row.me .tier-nm{color:var(--accent)}
+  .tier-ic{width:20px;height:20px;image-rendering:pixelated;flex-shrink:0;object-fit:contain}
+  .tier-rank{width:34px;color:var(--sub);font-weight:bold;flex-shrink:0;text-align:right}
+  .tier-row.me .tier-rank{color:var(--accent)}
+  .tier-nm{flex:1;color:var(--text);font-size:.917em}
+  .tier-ops{color:var(--sub);font-size:.833em;text-align:right}
+  .tier-ops b{color:var(--accent)}
+  /* connect modal */
+  #gh-connect{left:50%;top:50%;transform:translate(-50%,-50%);width:320px}
+  .gh-form{padding:12px;display:flex;flex-direction:column;gap:8px}
+  .gh-form input{background:var(--bg);border:1px solid var(--border);color:var(--text);
+    padding:7px 9px;font-family:inherit;font-size:1em;outline:none;border-radius:3px}
+  .gh-form input:focus{border-color:var(--accent)}
+  .gh-form .hint{color:var(--sub);font-size:.833em}
+  .gh-form .row{display:flex;gap:8px}
+  .gh-form button{background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    padding:7px 10px;font-family:inherit;font-size:1em;cursor:pointer;border-radius:3px}
+  .gh-form button.primary{background:var(--rowCurrent);border-color:var(--accent);color:var(--accent)}
+  .gh-form button:hover{border-color:var(--accent);color:var(--accent)}
+  #gh-status{font-size:.917em;padding:0 12px 10px;color:var(--green)}
+  #gh-status.err{color:var(--danger)}
+  #gh-status .gh-u{display:flex;align-items:center;gap:6px}
+  #gh-status img{width:20px;height:20px;image-rendering:pixelated;border-radius:50%}
+  /* empty hint */
+  .pempty{color:var(--sub);padding:14px;text-align:center;font-size:.917em}
+  #hdr .gh-chip{display:inline-flex;align-items:center;gap:5px;color:var(--chip);
+    font-size:.917em;border:1px solid var(--chip);border-radius:3px;padding:1px 6px;cursor:pointer}
+  #hdr .gh-chip img{width:14px;height:14px;image-rendering:pixelated;border-radius:50%}
+  #hdr .gh-chip.dev{color:var(--dev);border-color:var(--dev)}
+  /* profile edit panel */
+  #edit{left:50%;top:50%;transform:translate(-50%,-50%);width:470px;max-height:88%;
+    pointer-events:auto}
+  #edit .ed-scroll{overflow-y:auto;flex:1;min-height:0}
+  .ed-section{border-bottom:1px solid var(--borderDim);padding:10px 12px}
+  .ed-section h4{color:var(--accent);font-size:.917em;letter-spacing:1px;margin:0 0 8px}
+  .ed-label{color:var(--sub);font-size:.75em;letter-spacing:1px;margin:6px 0 3px;display:block}
+  .ed-input{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);
+    color:var(--text);padding:7px 9px;font-family:inherit;font-size:.917em;outline:none;border-radius:3px;margin-top:2px}
+  .ed-input:focus{border-color:var(--accent)}
+  textarea.ed-input{resize:vertical;min-height:52px}
+  .ed-links{display:flex;flex-direction:column;gap:6px}
+  .ed-linkrow{display:flex;gap:6px;align-items:center}
+  .ed-linkrow img{width:16px;height:16px;flex-shrink:0;object-fit:contain}
+  .ed-linkrow.dragging{opacity:.4}
+  .ed-linkrow.drag-over{border-top:2px solid var(--accent)}
+  .ed-drag{cursor:grab;color:var(--sub);flex-shrink:0;font-size:1em;user-select:none;
+    padding:0 2px;line-height:1}
+  .ed-drag:active{cursor:grabbing}
+  .ed-linkrow input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    padding:6px 8px;font-family:inherit;font-size:.833em;outline:none;border-radius:3px}
+  .ed-linkrow input:focus{border-color:var(--accent)}
+  .ed-linkrow select{flex:0 0 auto;max-width:112px;background:var(--bg);border:1px solid var(--border);
+    color:var(--text);padding:6px 4px;font-family:inherit;font-size:.833em;outline:none;border-radius:3px}
+  .ed-linkrow select:focus{border-color:var(--accent)}
+  .ed-del{cursor:pointer;background:var(--panel2);border:1px solid var(--border);color:var(--danger);
+    border-radius:3px;width:24px;height:24px;flex-shrink:0;font-family:inherit}
+  .ed-add{cursor:pointer;background:var(--panel2);border:1px solid var(--border);color:var(--accent);
+    border-radius:3px;padding:4px 10px;font-family:inherit;font-size:.833em;margin-top:4px}
+  .ed-add:hover{border-color:var(--accent)}
+  .ed-tierpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:4px;
+    max-height:170px;overflow-y:auto;padding:4px;border:1px solid var(--borderDim);border-radius:3px;background:var(--bg)}
+  .ed-tiercell{display:flex;flex-direction:column;align-items:center;cursor:pointer;
+    border:1px solid var(--borderDim);border-radius:3px;padding:2px 1px;background:var(--panel)}
+  .ed-tiercell:hover{border-color:var(--accent)}
+  .ed-tiercell img{width:26px;height:26px;image-rendering:pixelated;object-fit:contain}
+  .ed-tiercell .ed-tiernum{font-size:.58em;color:var(--sub);line-height:1}
+  .ed-tiercell.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .ed-tiercell.sel .ed-tiernum{color:var(--accent)}
+  .ed-tiercell.locked{cursor:not-allowed;opacity:.35;filter:grayscale(1)}
+  .ed-tiercell.locked:hover{border-color:var(--borderDim);box-shadow:none}
+  .ed-tiercell.locked img{filter:grayscale(1) brightness(.5) opacity(.6)}
+  .ed-tiercell.locked .ed-tiernum{color:var(--sub)}
+  .ed-theme-row{display:flex;align-items:center;gap:8px;margin:5px 0}
+  .ed-theme-row label{flex:1;color:var(--text);font-size:.833em}
+  .ed-theme-row input[type=color]{width:34px;height:24px;border:1px solid var(--border);border-radius:3px;
+    background:var(--panel2);cursor:pointer;padding:0}
+  .ed-theme-row input[type=number]{width:64px;background:var(--bg);border:1px solid var(--border);
+    color:var(--text);padding:4px 6px;font-family:inherit;font-size:.833em;border-radius:3px}
+  .ed-theme-row .ed-input{width:auto;flex:1}
+  .ed-cat{color:var(--sub);font-size:.75em;letter-spacing:1px;text-transform:uppercase;
+    margin:10px 0 2px;border-top:1px solid var(--borderDim);padding-top:8px}
+  .ed-cat:first-child{border-top:none;margin-top:0;padding-top:0}
+  .ed-preset{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    padding:5px 6px;font-family:inherit;font-size:.833em;border-radius:3px;margin:2px 0 6px;
+    cursor:pointer}
+  .ed-preset:focus{border-color:var(--accent);outline:none}
+  .ed-custom{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:3px;margin:2px 0 6px;cursor:pointer;font-family:inherit;font-size:.833em}
+  .ed-custom summary{padding:5px 6px;color:var(--sub);letter-spacing:1px;text-transform:uppercase;
+    font-size:.75em;list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+  .ed-custom summary::-webkit-details-marker{display:none}
+  .ed-custom summary::after{content:"▸";color:var(--sub);transition:transform .15s}
+  .ed-custom[open] summary::after{transform:rotate(90deg)}
+  .ed-custom[open] summary{color:var(--accent);border-bottom:1px solid var(--borderDim)}
+  .ed-custom-body{padding:2px 6px 6px}
+  /* Sub-Themes: the collapsible wrapper around the per-category dropdowns. */
+  .ed-subthemes{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:3px;margin:2px 0 6px;cursor:pointer;font-family:inherit;font-size:.833em}
+  .ed-subthemes summary{padding:5px 6px;color:var(--sub);letter-spacing:1px;text-transform:uppercase;
+    font-size:.75em;list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+  .ed-subthemes summary::-webkit-details-marker{display:none}
+  .ed-subthemes summary::after{content:"▸";color:var(--sub);transition:transform .15s}
+  .ed-subthemes[open] summary::after{transform:rotate(90deg)}
+  .ed-subthemes[open] summary{color:var(--accent);border-bottom:1px solid var(--borderDim)}
+  .ed-subthemes-body{padding:2px 6px 6px}
+  .ed-master{font-weight:bold;color:var(--accent);letter-spacing:1px;text-transform:uppercase;
+    font-size:.75em;margin:8px 0 2px}
+  .ed-save{display:block;width:100%;cursor:pointer;background:var(--accent);color:#000;border:none;
+    border-radius:3px;padding:9px;font-family:inherit;font-size:1em;font-weight:bold;margin-top:10px}
+  .ed-save:hover{filter:brightness(1.1)}
+  .ed-logout{display:block;width:100%;cursor:pointer;background:#d84f6f;color:#fff;border:none;
+    border-radius:3px;padding:9px;font-family:inherit;font-size:.917em;font-weight:bold;margin-top:8px}
+  .ed-logout:hover{background:#f06f90}
+  .ed-status{color:var(--green);font-size:.833em;padding:6px 12px;display:none}
+  /* about / credits */
+  #about{left:50%;top:50%;transform:translate(-50%,-50%);width:440px;max-height:86%;pointer-events:auto}
+  #about .ab-scroll{overflow-y:auto;flex:1;min-height:0;padding:4px 14px 14px}
+  .ab-block{padding:12px 0;border-bottom:1px solid var(--borderDim)}
+  .ab-block:last-child{border-bottom:none}
+  .ab-kicker{color:var(--accent);font-size:.75em;letter-spacing:1px;margin-bottom:6px}
+  .ab-block p{color:var(--text);font-size:.917em;line-height:1.5;margin:0 0 8px}
+  .ab-block p b{color:var(--accent)}
+  .ab-links{display:flex;flex-wrap:wrap;gap:6px}
+  .ab-link{display:inline-flex;align-items:center;gap:6px;color:var(--link);background:var(--panel2);
+    border:1px solid var(--border);border-radius:3px;padding:4px 8px;text-decoration:none;font-size:.833em}
+  .ab-link:hover{border-color:var(--accent);color:var(--accent)}
+  .ab-link img{width:14px;height:14px;object-fit:contain}
+  /* The About popup sits on the dark --panel; its black simpleicons GitHub
+     logos need inverting to white to stay visible. */
+  .ab-link img[src*="simpleicons.org/github/"]{filter:invert(1)}
+  /* tier tooltip (top-right) */
+  #tooltip{position:fixed;top:10px;right:10px;z-index:60;pointer-events:none;
+    background:var(--panel);border:2px solid var(--border);border-radius:6px;padding:10px 12px;
+    max-width:240px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+  #tooltip .tt-top{display:flex;align-items:center;gap:10px}
+  #tooltip img{width:64px;height:64px;image-rendering:pixelated;object-fit:contain;flex-shrink:0}
+  #tooltip .tt-name{color:var(--accent);font-weight:bold;font-size:1em}
+  #tooltip .tt-num{color:var(--sub);font-size:.75em}
+  #tooltip .tt-req{color:var(--text);font-size:.833em;margin-top:6px}
+  #tooltip .tt-mat{color:var(--sub);font-size:.75em;margin-top:2px}
+  /* silhouette for locked tiers */
+  .tier-row.locked .tier-ic{filter:grayscale(1) brightness(.4) opacity(.55)}
+  /* agents roster in profile */
+  .pc-aglist{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+  .pc-ag{display:flex;align-items:center;gap:6px;font-size:.833em;color:var(--text)}
+  .pc-ag .ag-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .pc-ag .ag-st{color:var(--sub);margin-left:auto}
+  /* tier unlock modal */
+  #unlock{left:50%;top:50%;transform:translate(-50%,-50%);width:380px;pointer-events:auto}
+  .un-body{padding:12px;text-align:center}
+  .un-title{color:var(--accent);font-size:1em;font-weight:bold;letter-spacing:1px;margin-bottom:4px}
+  .un-sub{color:var(--sub);font-size:.833em;margin-bottom:12px}
+  .un-compare{display:flex;align-items:center;justify-content:center;gap:16px}
+  .un-card{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .un-card img{width:72px;height:72px;image-rendering:pixelated;object-fit:contain;
+    border:1px solid var(--border);border-radius:6px;padding:6px;background:var(--bg)}
+  .un-list{max-height:38vh;overflow-y:auto;margin:0 0 12px;border:1px solid var(--borderDim);
+    border-radius:4px;text-align:left;background:var(--bg)}
+  .un-list .tier-row:last-child{border-bottom:none}
+  .un-card .un-lbl{color:var(--sub);font-size:.75em}
+  .un-card.new img{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .un-arrow{color:var(--sub);font-size:1.2em}
+  .un-btns{display:flex;gap:8px;margin-top:14px}
+  .un-btn{flex:1;cursor:pointer;background:var(--panel2);border:1px solid var(--border);
+    color:var(--text);border-radius:3px;padding:8px;font-family:inherit;font-size:.833em}
+  .un-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .un-btn.primary{background:var(--accent);color:#000;border:none;font-weight:bold}
+  .un-mute{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;
+    color:var(--sub);font-size:.75em;cursor:pointer}
+  .un-mute input{width:auto;margin:0;cursor:pointer}
+  /* dev rainbow: animated border + rainbow name text */
+  @keyframes rainbowBorder{0%{border-color:#ff0000}17%{border-color:#ff8800}33%{border-color:#ffff00}50%{border-color:#00ff00}67%{border-color:#0088ff}83%{border-color:#8800ff}100%{border-color:#ff0000}}
+  @keyframes rainbowText{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+  .rainbow-border{border-color:#ff0000;animation:rainbowBorder 2.5s linear infinite}
+  .rainbow-name{background:linear-gradient(90deg,#ff0000,#ff8800,#ffff00,#00ff00,#0088ff,#8800ff,#ff0000);
+    background-size:200% 100%;-webkit-background-clip:text;background-clip:text;
+    color:transparent!important;-webkit-text-fill-color:transparent;
+    animation:rainbowText 2.5s linear infinite}
+
 </style>
 </head>
 <body>
 <div id="wrap">
   <div id="hdr">
     <span>☤ HERMES PIXEL OFFICE</span>
+    <div id="stats">
+      <span class="st" title="currency — points earned per tool call">
+        <img class="coin" src="icons/op.webp" alt=""> <b id="st-ops">0</b> Ops</span>
+      <span class="sep">·</span>
+      <span class="st" title="tool calls"><b id="st-tools">0</b> calls</span>
+      <span class="sep">·</span>
+      <span class="st" title="sessions run"><b id="st-sess">0</b> sessions</span>
+      <span class="sep">·</span>
+      <span class="st" title="total time ran"><b id="st-time">0s</b> ran</span>
+    </div>
     <span style="flex:1"></span>
     <span class="dim" id="count">connecting…</span>
+    <span class="gh-chip" id="gh-chip" title="connect a GitHub identity">⚙ connect</span>
+    <span class="btn" id="tiersBtn" title="tier ladder">Tiers</span>
+    <span class="btn" id="lbBtn" title="leaderboard">Leaderboard</span>
+    <span class="btn" id="mbBtn" title="model leaderboard (jekyll-hyde corrections)">Models</span>
+    <span class="btn" id="chatBtn" title="office chat">Chat</span>
+    <span class="btn" id="aboutBtn" title="about & credits">About</span>
     <span class="btn" id="sound" title="chime when an agent needs approval or a subagent finishes">♪ sound off</span>
     <span class="btn" id="spawn" style="display:none" title="open a terminal running hermes">+ agent</span>
   </div>
-  <canvas id="c"></canvas>
+  <div id="office" style="position:relative;flex:1;min-height:0;overflow:hidden">
+    <canvas id="c"></canvas>
+    <div id="panel-holder">
+      <div class="panel" id="lb"><div class="ptitle"><span>LEADERBOARD</span><span class="pclose" data-close="lb">✕</span></div><div id="lb-list"></div></div>
+      <div class="panel" id="mb"><div class="ptitle"><span>MODEL LEADERBOARD</span><span class="pclose" data-close="mb">✕</span></div><div id="mb-list"></div></div>
+      <div class="panel" id="tiers"><div class="ptitle"><span>TIER LADDER</span><span class="pclose" data-close="tiers">✕</span></div><div id="tier-list"></div></div>
+      <div class="panel" id="chat"><div class="ptitle"><span>OFFICE CHAT</span><span style="display:flex;align-items:center;gap:6px"><span class="csnd" id="chat-sound" title="chat message sound">♪ sound off</span><span class="pclose" data-close="chat">✕</span></span></div>
+        <div id="chat-list"></div>
+        <div id="chat-input-row"><input id="chat-input" placeholder="say something to the office…" autocomplete="off"><button id="chat-send">▶</button></div>
+      </div>
+      <div class="panel" id="prof"></div>
+      <div class="panel" id="edit"></div>
+      <div class="panel" id="about">
+        <div class="ptitle"><span>ABOUT / CREDITS</span><span class="pclose" data-close="about">✕</span></div>
+        <div class="ab-scroll">
+          <div class="ab-block">
+            <div class="ab-kicker">VERSION</div>
+            <p><b>Hermes Pixel Office Enhanced</b> — <b id="about-version">v1.3.2</b></p>
+          </div>
+          <div class="ab-block">
+            <div class="ab-kicker">ORIGINAL PLUGIN</div>
+            <p>Hermes Pixel Office was originally created by <b>Teknium</b> — a pixel-art virtual office that turns every Hermes agent into an animated character at a desk. This fork, <b>Hermes Pixel Office Enhanced</b>, builds on that clean foundation and takes it further.</p>
+            <div class="ab-links"><a class="ab-link" href="https://github.com/teknium1/hermes-pixel-office" target="_blank" rel="noopener"><img src="https://cdn.simpleicons.org/github/181717" alt="" onerror="this.style.display='none'"> teknium1/hermes-pixel-office</a></div>
+          </div>
+          <div class="ab-block">
+            <div class="ab-kicker">THE ENHANCEMENT — BY DRGEKOZ</div>
+            <p>I'm <b>DrGekoz</b>. I made <b>Hermes IdleViber</b>, a cozy pixel idle game. When the office came along, I started adapting the bits of IdleViber I love most — its tier ladder, all 500 pixel icons, and its peer-to-peer mesh — into the plugin. So the office became a place you can actually live in: a GitHub leaderboard, a 500-rung tier ladder, office chat, and custom profiles and themes, all shared with friends.</p>
+            <div class="ab-links">
+              <a class="ab-link" href="https://hermes-idleviber.netlify.app" target="_blank" rel="noopener"><img src="https://cdn.simpleicons.org/itchdotio/FA5C5C" alt="" onerror="this.style.display='none'"> Play Hermes IdleViber</a>
+              <a class="ab-link" href="https://github.com/DrGekoz/Hermes-IdleViber" target="_blank" rel="noopener"><img src="https://cdn.simpleicons.org/github/181717" alt="" onerror="this.style.display='none'"> DrGekoz/Hermes-IdleViber</a>
+              <a class="ab-link" href="https://github.com/DrGekoz" target="_blank" rel="noopener"><img src="https://cdn.simpleicons.org/github/181717" alt="" onerror="this.style.display='none'"> github.com/DrGekoz</a>
+            </div>
+          </div>
+          <div class="ab-block">
+            <div class="ab-kicker">MULTIPLAYER — FREE CLOUDFLARE RELAY</div>
+            <p>Leaderboards, chat and profiles now ride a <b>free Cloudflare relay</b> (Workers + Durable Object) that everyone can write to over plain HTTPS. That means it works on <b>any</b> network — no port-forwarding, no TURN, no WebRTC required — and it keys the board by <b>GitHub username</b>, so the same account shows once even across multiple browsers or machines. WebRTC still runs underneath for low-latency realtime when peers can reach each other directly. Zero config: connect your GitHub and you're on the shared board automatically. The whole board is also backed up to a gist every 10 minutes.</p>
+          </div>
+          <div class="ab-block">
+            <div class="ab-kicker">JEKYLL-HYDE — COMPLETION AUDITOR</div>
+            <p>This office has built-in <b>support</b> for <b>Jekyll-Hyde</b>, a Hermes plugin by <b>jnorthrup</b> (Jim Northrup) that audits agent completion and drives verified next actions. Install it to start feeding the <b>Model Leaderboard</b> (Models button), which ranks models by how much Hyde has had to correct them — the most-corrected model sinks to the bottom. Each row shows the sandbagged / genuine / uncertain verdict breakdown. The board rides the P2P mesh, so peers' audit data merges in.</p>
+            <div class="ab-links"><a class="ab-link" href="https://github.com/jnorthrup/hermes-jekyl-hyde" target="_blank" rel="noopener"><img src="https://cdn.simpleicons.org/github/181717" alt="" onerror="this.style.display='none'"> jnorthrup/hermes-jekyl-hyde</a></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="unlock"></div>
+      <div class="panel" id="gh-connect">
+        <div class="ptitle"><span>CONNECT GITHUB</span><span class="pclose" data-close="gh-connect">✕</span></div>
+        <div class="gh-form">
+          <button class="primary" id="gh-login" style="padding:9px 10px">⇪ Log in with GitHub</button>
+          <div class="hint">Logs in with the GitHub account this machine is authenticated as, so your real username + avatar show on the leaderboard. Logging in is what lets your scores and chat reach other users over P2P. Click your name in the top bar to open your profile.</div>
+          <div class="row"><button id="gh-clear" style="flex:1">Disconnect</button></div>
+        </div>
+        <div id="gh-status"></div>
+      </div>
+    </div>
+  </div>
 </div>
+<div id="tooltip"></div>
+<script src="tiers.js"></script>
+<script src="p2p.js"></script>
 <script>
 "use strict";
+// ── single source of truth for the office version ─────────────────────────
+// Bump this to match the git tag on every release (also shown in the About
+// modal via the #about-version element).
+const OFFICE_VERSION = "v1.4.3";
 // ── host detection ──────────────────────────────────────────────────────
 const IN_VSCODE = typeof acquireVsCodeApi !== "undefined";
 const vsapi = IN_VSCODE ? acquireVsCodeApi() : null;
 
+// ── external links in a real browser ─────────────────────────────────────
+// When the office runs inside an emulated/embedded browser (a VSCode webview,
+// Hermes Desktop webview, or any sandboxed iframe) a plain `target="_blank"`
+// anchor can be swallowed by the host. This delegated handler catches every
+// external http(s) link and routes it to the real browser: through the host
+// via postMessage when we're in the VSCode webview, otherwise via window.open
+// (with a same-frame fallback). In a normal top-level browser tab we leave the
+// anchor's default behavior alone.
+document.addEventListener("click", function (e) {
+  const t = e.target;
+  const a = (t && t.closest) ? t.closest("a[href]") : null;
+  if (!a) return;
+  const href = a.getAttribute("href") || "";
+  if (!/^https?:\/\//i.test(href)) return;
+  const embedded = IN_VSCODE || (window.top !== window.self);
+  if (!embedded) return;                 // real browser tab: default is fine
+  e.preventDefault();
+  if (IN_VSCODE && vsapi) {
+    vsapi.postMessage({ type: "openExternal", url: href });
+  } else {
+    const w = window.open(href, "_blank");
+    if (!w) { try { location.href = href; } catch (_) {} }
+  }
+}, true);
+
 const cv = document.getElementById("c"), ctx = cv.getContext("2d");
 let S = 4;                                  // pixel scale (auto-shrinks if crowded)
 let agents = [], frame = 0, offline = null;
+let state = null;
 
 // ── palettes / sprites ──────────────────────────────────────────────────
-const SKIN=["#f0c8a0","#c68b59","#8d5524","#ffdbac","#e0ac69","#a1665e"];
-const SHIRT=["#4fa4d8","#d84f6f","#5fce7a","#c9a227","#9b6fd8","#d87f4f"];
-const HAIR=["#2b2b2b","#5a3825","#c9a227","#8a8a8a","#7a3030","#4a6741"];
+let SKIN=shadePalette("#f0c8a0",6);
+let SHIRT=shadePalette("#4fa4d8",6);
+let HAIR=shadePalette("#2b2b2b",6);
 function hash(s){let h=0;for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))|0}return Math.abs(h)}
 function px(x,y,w,h,col){ctx.fillStyle=col;ctx.fillRect(Math.round(x*S),Math.round(y*S),w*S,h*S)}
+
+// ── helpers ─────────────────────────────────────────────────────────────
+function fmtNum(n){n=Math.round(Number(n)||0);if(n>=1e9)return (n/1e9).toFixed(1)+"B";
+  if(n>=1e6)return (n/1e6).toFixed(1)+"M";if(n>=1e3)return (n/1e3).toFixed(1)+"k";return ""+n}
+function fmtTime(s){s=Math.floor(Number(s)||0);const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  if(h)return h+"h "+m+"m";if(m)return m+"m "+sec+"s";return sec+"s"}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function iconPath(name){return "icons/"+(name||"001_Wood_Heraldic_Shield_orig462")+".webp"}
+function iconPathLarge(name){return "icons/large/"+(name||"001_Wood_Heraldic_Shield_orig462")+".webp"}
+// Ops-derived requirements: ~2 Ops per tool call, ~150 calls per session.
+function tierCalls(ops){return Math.ceil((Number(ops)||0)/2);}
+function tierSessions(ops){return Math.ceil(tierCalls(ops)/150);}
+function timeStr(ts){const d=new Date(ts*1000);return d.toTimeString().slice(0,5)}
+function isDev(g){return /^(drgekoz|teknium1|jnorthrup)$/i.test(g||"")}
+function isMe(id){return state&&state.identity&&(id===state.identity.github||id===state.identity.name)}
+
+// ── link platforms + interface theming ────────────────────────────────
+const LINK_PLATFORMS=[
+  {key:"github",name:"GitHub",color:"181717",slug:"github"},
+  {key:"repos",name:"GitHub Repos",color:"181717",slug:"github"},
+  {key:"youtube",name:"YouTube",color:"FF0000",slug:"youtube"},
+  {key:"reddit",name:"Reddit",color:"FF4500",slug:"reddit"},
+  {key:"spotify",name:"Spotify",color:"1DB954",slug:"spotify"},
+  {key:"soundcloud",name:"SoundCloud",color:"FF5500",slug:"soundcloud"},
+  {key:"discord",name:"Discord",color:"5865F2",slug:"discord"},
+  {key:"steam",name:"Steam",color:"000000",slug:"steam"}
+];
+function linkIcon(key){const p=LINK_PLATFORMS.find(x=>x.key===key);return p?"https://cdn.simpleicons.org/"+p.slug+"/"+p.color:"";}
+function linkName(key){const p=LINK_PLATFORMS.find(x=>x.key===key);return p?p.name:key;}
+// Extract a friendly display name from a profile link URL (e.g. the GitHub
+// username, a repo name, a Discord/YouTube handle). Falls back to a cleaned
+// URL or the platform name when nothing useful can be pulled out.
+function linkDisplayName(key,url){
+  const s=String(url||"").trim();
+  if(!s)return linkName(key);
+  try{
+    const u=/^https?:\/\//i.test(s)?new URL(s):new URL("https://"+s);
+    const parts=u.pathname.split("/").filter(Boolean);
+    const last=parts.length?decodeURIComponent(parts[parts.length-1]).replace(/\.git$/i,""):"";
+    if(key==="repos")return last||"repo";
+    if(key==="github")return parts[0]||last||"GitHub";
+    if(key==="discord")return "DISCORD";
+    if(key==="youtube"){
+      const m=s.match(/@([A-Za-z0-9_\-]+)/);
+      if(m)return "@"+m[1];
+      if(parts.length)return parts[parts.length-1];
+      return "YouTube";
+    }
+    if(key==="reddit"){
+      // reddit.com/u/user or reddit.com/user/user, or r/subreddit
+      if(parts[0]==="u"||parts[0]==="user")return "u/"+parts[1];
+      if(parts[0]==="r")return "r/"+parts[1];
+      return parts[0]||last||"Reddit";
+    }
+    if(key==="steam"){
+      if(parts[0]==="id"||parts[0]==="profiles")return parts[1]||last||"Steam";
+      return last||"Steam";
+    }
+    if(key==="spotify")return (last||u.hostname).slice(0,12);
+    if(key==="soundcloud")return parts[0]||last||"SoundCloud";
+    return last||u.hostname;
+  }catch(e){return s;}
+}
+
+// Normalize a profile's links into a flat, order-preserving array of
+// {platform, url} objects so reordering (drag-and-drop) is free across
+// platforms. Legacy data stored links as {platform:[url,...]} — flatten
+// that in LINK_PLATFORMS order so older saved profiles keep working.
+function normalizeLinks(raw){
+  if(Array.isArray(raw)){
+    return raw
+      .map(l=>typeof l==="string"?{platform:"github",url:l}:(l||{}))
+      .filter(l=>String(l.url||"").trim());
+  }
+  if(raw && typeof raw==="object"){
+    const out=[];
+    LINK_PLATFORMS.forEach(p=>{
+      const arr=raw[p.key];
+      if(Array.isArray(arr))arr.forEach(u=>{if(String(u||"").trim())out.push({platform:p.key,url:u});});
+    });
+    return out;
+  }
+  return [];
+}
+
+const THEME_DEFAULTS={bg:"#1a1423",panel:"#221a2e",panel2:"#241c30",panelHover:"#2a2138",
+  border:"#3a2f4b",borderDim:"#2c2340",rowMe:"#2a2438",rowCurrent:"#33291a",
+  accent:"#e8c170",text:"#cfc4e8",sub:"#7a6f8f",green:"#5fce7a",dev:"#ffd700",
+  link:"#7fa8d8",linkHover:"#a8c8e8",danger:"#d84f6f",scroll:"#4a3f63",time:"#555",
+  chip:"#7fa8d8",on:"#5fce7a",
+  cvFloor:"#2a2138",cvFloorAlt:"#251d31",cvWall:"#3a2f4b",cvWallTrim:"#241c30",
+  cvWindow:"#151022",cvWindowGlass:"#3b5a8f",cvWindowGlow:"#7fa8d8",
+  cvDesk:"#6b4a2f",cvDeskDark:"#54381f",cvDeskLeg:"#3c2814",cvMonitor:"#191524",
+  cvScreen:"#0f2c1e",cvPlant:"#5fce7a",cvPlantDark:"#4aa860",cvPot:"#8d5524",
+  agSkin:"#f0c8a0",agShirt:"#4fa4d8",agHair:"#2b2b2b",
+  font:"ui-monospace,Menlo,Consolas,monospace",fontSize:12};
+// 8-bit / retro pixel fonts available for the interface theme (loaded via
+// Google Fonts in <head>). Value is the CSS font-family stack.
+const FONT_OPTIONS=[
+  {label:"Monospace (default)",value:"ui-monospace,Menlo,Consolas,monospace"},
+  {label:"Press Start 2P",value:"'Press Start 2P',monospace"},
+  {label:"VT323",value:"'VT323',monospace"},
+  {label:"Silkscreen",value:"'Silkscreen',monospace"},
+  {label:"Pixelify Sans",value:"'Pixelify Sans',monospace"},
+  {label:"DotGothic16",value:"'DotGothic16',monospace"},
+  {label:"Rubik Pixel",value:"'Rubik Pixel',monospace"},
+  {label:"Space Mono",value:"'Space Mono',monospace"}
+];
+// Pre-built color presets per interface-theme category. Populated entirely by
+// the colour-series generator below (every section gets each main colour).
+const INTERFACE_PRESETS={main:[],leaderboard:[],chat:[],other:[],canvas:[],agents:[]};
+// Pre-built themes for the PROFILE popup (profileTheme). Also filled by the
+// colour-series generator below.
+const PROFILE_PRESETS=[];
+// ── colour helpers ───────────────────────────────────────────────────
+function _hexRgb(hex){
+  let h=String(hex||"#000000").replace(/^#/,"");
+  if(h.length===3)h=h.split("").map(x=>x+x).join("");
+  if(h.length!==6)return [0,0,0];
+  return [parseInt(h.slice(0,2),16)||0,parseInt(h.slice(2,4),16)||0,parseInt(h.slice(4,6),16)||0];
+}
+function mixHex(a,b,t){
+  const A=_hexRgb(a),B=_hexRgb(b);t=Math.max(0,Math.min(1,t||0));
+  const m=k=>Math.round(A[k]+(B[k]-A[k])*t);
+  return "#"+[m(0),m(1),m(2)].map(x=>Math.max(0,Math.min(255,x)).toString(16).padStart(2,"0")).join("");
+}
+function hueShift(hex,deg){
+  let h=String(hex||"#000").replace(/^#/,""); if(h.length===3)h=h.split("").map(x=>x+x).join("");
+  const r=parseInt(h.slice(0,2),16)/255,g=parseInt(h.slice(2,4),16)/255,b=parseInt(h.slice(4,6),16)/255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
+  let s=mx===0?0:d/mx,l=(mx+mn)/2,hh=0;
+  if(d){if(mx===r)hh=((g-b)/d)%6;else if(mx===g)hh=(b-r)/d+2;else hh=(r-g)/d+4;hh*=60;if(hh<0)hh+=360;}
+  hh=((hh+deg)%360+360)%360;
+  const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((hh/60)%2-1)),m=l-c/2;
+  let rr=0,gg=0,bb=0;
+  if(hh<60){rr=c;gg=x;}else if(hh<120){rr=x;gg=c;}else if(hh<180){gg=c;bb=x;}else if(hh<240){gg=x;bb=c;}else if(hh<300){rr=x;bb=c;}else{rr=c;bb=x;}
+  const to=n=>Math.round((n+m)*255).toString(16).padStart(2,"0");
+  return "#"+to(rr)+to(gg)+to(bb);
+}
+function shadeHex(hex,amt){ // reuse shadeColor if defined later; standalone guard
+  return (typeof shadeColor==="function")?shadeColor(hex,amt):hex;
+}
+
+// A theme palette is {accent, alt, dark, text, sub}. buildTheme() expands it
+// into every category's value object so each theme applies consistently.
+function buildTheme(pal){
+  const d=pal.dark, a=pal.accent, alt=pal.alt, t=pal.text, s=pal.sub;
+  return {
+    main:{bg:mixHex(d,a,0.02),panel:mixHex(d,a,0.06),panel2:mixHex(d,a,0.10),
+      panelHover:mixHex(d,a,0.15),border:mixHex(d,a,0.28),borderDim:mixHex(d,a,0.16),
+      accent:a,text:t,sub:s,chip:a,on:alt,scroll:mixHex(d,a,0.20)},
+    leaderboard:{rowMe:mixHex(d,a,0.10),rowCurrent:mixHex(d,alt,0.16),green:alt,dev:"#ffd700"},
+    chat:{link:a,linkHover:mixHex(a,t,0.35),time:s},
+    canvas:{cvFloor:mixHex(d,a,0.12),cvFloorAlt:mixHex(d,a,0.08),cvWall:mixHex(d,a,0.20),
+      cvWallTrim:mixHex(d,a,0.26),cvWindow:mixHex(d,a,0.34),cvWindowGlass:mixHex(d,alt,0.35),
+      cvWindowGlow:a,cvDesk:mixHex(d,a,0.18),cvDeskDark:mixHex(d,a,0.12),cvDeskLeg:mixHex(d,a,0.08),
+      cvMonitor:mixHex(d,a,0.30),cvScreen:mixHex(d,alt,0.45),cvPlant:alt,cvPlantDark:mixHex(d,alt,0.15),
+      cvPot:mixHex(d,alt,0.12)},
+    agents:{agSkin:"#f0c8a0",agShirt:a,agHair:mixHex(d,a,0.30)},
+    other:{danger:"#e0526b"},
+    profile:{color:a,border:a,bg:d,text:t,sub:s,link:a,green:alt,dev:"#ffd700"}
+  };
+}
+
+// ── theme definitions ────────────────────────────────────────────────
+// Group "Color": the original one-per-colour themes, kept at the top.
+const COLOR_SERIES=[
+  ["Scarlet","#ff5f5f"],["Ember","#ff9e3d"],["Sunflare","#ffd94d"],["Emerald","#5fce7a"],
+  ["Frost","#3ee6b0"],["Lagoon","#45d6e8"],["Azure","#5fa8ff"],["Orchid","#9a7bff"],
+  ["Neon","#ff5fd0"],["Amethyst","#b05fe8"]
+];
+// Group "Palette": extra cool multi-colour themes.
+// [name, accent, alt, dark, text, sub]
+const COOL_PALETTES=[
+  ["Synthwave", "#ff3d8f", "#39d0ff", "#1a0b2e", "#fff0fa", "#b79ad0"],
+  ["Cyberpunk", "#00f0ff", "#ff2e6b", "#0a0a1a", "#e8faff", "#7a8fa8"],
+  ["Ocean",     "#2fa9ff", "#3ee6c0", "#04121f", "#eaf6ff", "#6f8faa"],
+  ["Forest",    "#5fd76b", "#b8e05a", "#08140a", "#eef9e9", "#7fa87f"],
+  ["Candy",     "#ff6bb3", "#7be8c8", "#1d0f1d", "#ffeef7", "#c79abf"],
+  ["Sunset",    "#ff7a3d", "#b45fd7", "#1c0d0f", "#fff3ea", "#c9a48f"],
+  ["Matrix",    "#33ff66", "#8fff33", "#041404", "#eafff0", "#6faa7a"],
+  ["Midnight",  "#7fb2ff", "#ffd77a", "#0a0f1c", "#eef4ff", "#7f93b8"],
+  ["Royal",     "#9a7bff", "#ffd77a", "#120b26", "#f3eeff", "#9f93c9"],
+  ["Slate",     "#5fa8e8", "#9fb8d8", "#0e1218", "#eef3f8", "#8a9bb0"],
+  ["Emberglow", "#ff9e3d", "#ff4d6b", "#1a0f08", "#fff2e6", "#c9a48a"],
+  ["Mint",      "#3ee6b0", "#7ee8ff", "#06201a", "#eafff8", "#7fb8a8"]
+];
+
+(function(){
+  const addTheme=(group,name,pal)=>{
+    const v=buildTheme(pal);
+    INTERFACE_PRESETS.main.push({group,name,values:v.main});
+    INTERFACE_PRESETS.leaderboard.push({group,name,values:v.leaderboard});
+    INTERFACE_PRESETS.chat.push({group,name,values:v.chat});
+    INTERFACE_PRESETS.canvas.push({group,name,values:v.canvas});
+    INTERFACE_PRESETS.agents.push({group,name,values:v.agents});
+    INTERFACE_PRESETS.other.push({group,name,values:v.other});
+    PROFILE_PRESETS.push({group,name,values:v.profile});
+  };
+  // Cool palettes first (top of the dropdown), then the original colour
+  // themes beneath them.
+  COOL_PALETTES.forEach(([n,a,alt,d,t,s])=>{
+    addTheme("Palette", n, {accent:a,alt:alt,dark:d,text:t,sub:s});
+  });
+  COLOR_SERIES.forEach(([n,c])=>{
+    addTheme("Color", n, {
+      accent:c, alt:hueShift(c,150),
+      dark:mixHex(c,"#0b0b14",0.55), text:mixHex(c,"#ffffff",0.72), sub:mixHex(c,"#ffffff",0.20)
+    });
+  });
+})();
+
+// Render a <select> option list grouped by each preset's category (the
+// original "Color" themes form their own group, the cool palettes another).
+function presetOptionsHtml(presets){
+  let html='<option value="">— choose a preset —</option>';
+  let last=null;
+  presets.forEach((p,i)=>{
+    const g=p.group||"";
+    if(g!==last){
+      if(last!==null)html+='</optgroup>';
+      html+='<optgroup label="'+esc(g)+'">';
+      last=g;
+    }
+    html+='<option value="'+i+'">'+esc(p.name)+'</option>';
+  });
+  if(last!==null)html+='</optgroup>';
+  return html;
+}
+const CSS_VAR_MAP={bg:"--bg",panel:"--panel",panel2:"--panel2",panelHover:"--panelHover",
+  border:"--border",borderDim:"--borderDim",rowMe:"--rowMe",rowCurrent:"--rowCurrent",
+  accent:"--accent",text:"--text",sub:"--sub",green:"--green",dev:"--dev",
+  link:"--link",linkHover:"--linkHover",danger:"--danger",scroll:"--scroll",time:"--time",
+  chip:"--chip",on:"--on",
+  cvFloor:"--cvFloor",cvFloorAlt:"--cvFloorAlt",cvWall:"--cvWall",cvWallTrim:"--cvWallTrim",
+  cvWindow:"--cvWindow",cvWindowGlass:"--cvWindowGlass",cvWindowGlow:"--cvWindowGlow",
+  cvDesk:"--cvDesk",cvDeskDark:"--cvDeskDark",cvDeskLeg:"--cvDeskLeg",cvMonitor:"--cvMonitor",
+  cvScreen:"--cvScreen",cvPlant:"--cvPlant",cvPlantDark:"--cvPlantDark",cvPot:"--cvPot",
+  agSkin:"--agSkin",agShirt:"--agShirt",agHair:"--agHair",
+  font:"--font",fontSize:"--fs"};
+// tracks the last theme actually applied, so closing the edit panel without
+// saving can revert to it (interface theme preview is live while editing).
+let lastAppliedTheme=null;
+function applyInterfaceTheme(theme){
+  theme=theme||{};
+  lastAppliedTheme=Object.assign({},THEME_DEFAULTS,theme);
+  const root=document.documentElement.style;
+  for(const k in CSS_VAR_MAP){
+    let v=(theme[k]!=null)?theme[k]:THEME_DEFAULTS[k];
+    if(k==="fontSize")v=String(v)+"px";
+    root.setProperty(CSS_VAR_MAP[k],String(v));
+  }
+  resolveScene();
+}
+// Resolve the theme's canvas + pixel-agent colors (CSS vars) into a plain
+// object the canvas render loop reads every frame, so theme changes take
+// effect on the office scene + agents immediately. Refreshed on apply.
+let SCENE={cvFloor:"#2a2138",cvFloorAlt:"#251d31",cvWall:"#3a2f4b",cvWallTrim:"#241c30",
+  cvWindow:"#151022",cvWindowGlass:"#3b5a8f",cvWindowGlow:"#7fa8d8",cvDesk:"#6b4a2f",
+  cvDeskDark:"#54381f",cvDeskLeg:"#3c2814",cvMonitor:"#191524",cvScreen:"#0f2c1e",
+  cvPlant:"#5fce7a",cvPlantDark:"#4aa860",cvPot:"#8d5524",
+  agSkin:"#f0c8a0",agShirt:"#4fa4d8",agHair:"#2b2b2b"};
+function resolveScene(){
+  const cs=getComputedStyle(document.documentElement);
+  const g=n=>{const v=cs.getPropertyValue("--"+n).trim();return v||SCENE[n]||""};
+  ["cvFloor","cvFloorAlt","cvWall","cvWallTrim","cvWindow","cvWindowGlass","cvWindowGlow",
+   "cvDesk","cvDeskDark","cvDeskLeg","cvMonitor","cvScreen","cvPlant","cvPlantDark","cvPot",
+   "agSkin","agShirt","agHair"].forEach(k=>SCENE[k]=g(k));
+  // rebuild per-agent palettes from the theme base hues
+  SKIN=shadePalette(SCENE.agSkin,6);
+  SHIRT=shadePalette(SCENE.agShirt,6);
+  HAIR=shadePalette(SCENE.agHair,6);
+}
+function shadePalette(base,n){
+  const out=[]; for(let i=0;i<n;i++){out.push(shadeColor(base,i/(n-1||1)*0.5-0.25));} return out;
+}
+function shadeColor(hex,amt){
+  hex=String(hex||"#888").replace("#",""); if(hex.length===3)hex=hex.split("").map(c=>c+c).join("");
+  let r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16);
+  const t=amt>0?255:0; const f=Math.abs(amt);
+  r=Math.round(r+(t-r)*f); g=Math.round(g+(t-g)*f); b=Math.round(b+(t-b)*f);
+  return "#"+[r,g,b].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+function ghAvatarFor(rowOrUser){
+  if(rowOrUser&&typeof rowOrUser==="object"){
+    if(rowOrUser.avatar)return rowOrUser.avatar;
+    if(rowOrUser.github)return "https://github.com/"+encodeURIComponent(rowOrUser.github)+".png";
+  }
+  const g=rowOrUser||"";return g?"https://github.com/"+encodeURIComponent(g)+".png":"";
+}
+function rowTierIcon(r){
+  if(r&&r.tierIcon)return r.tierIcon;
+  const t=(r&&r.tier)||(r?tierForOps(r.ops,r.tools,r.sessions):null);
+  return t&&t.icon?t.icon:"";
+}
+function myGitHub(){return (state&&state.identity&&state.identity.github)?state.identity.github:"";}
+function isMine(r){const g=myGitHub();return !!g&&String(r&&r.github||"").toLowerCase()===g.toLowerCase();}
+// apply a locally-saved interface theme (persists across reloads, pre-server)
+try{const lt=localStorage.getItem("pixelOfficeTheme");if(lt){const t=JSON.parse(lt);if(t&&typeof t==="object")applyInterfaceTheme(t);}}catch(e){}
+resolveScene();
+
+// ── local profile cache (overlay so edits work even before server restart) ──
+function localProfileKey(){const g=myGitHub();return g?"pixelOfficeProfile_"+g.toLowerCase():"";}
+function loadLocalProfile(){const k=localProfileKey();if(!k)return null;try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
+function saveLocalProfile(p){const k=localProfileKey();if(!k)return;try{localStorage.setItem(k,JSON.stringify(p));}catch(e){}}
+function applyLocalProfile(){
+  if(!state||!state.identity||!state.identity.github)return;
+  const gh=state.identity.github.toLowerCase();
+  const prof=loadLocalProfile();
+  if(!prof)return;
+  const row=(state.leaderboard||[]).find(r=>r.github&&String(r.github).toLowerCase()===gh);
+  if(!row)return;
+  if(prof.bio!=null)row.bio=prof.bio;
+  if(prof.links)row.links=prof.links;
+  if(prof.tierIcon!=null)row.tierIcon=prof.tierIcon;
+  if(prof.profileTheme)row.profileTheme=prof.profileTheme;
+  if(prof.interfaceTheme)row.interfaceTheme=prof.interfaceTheme;
+}
+function pushMyProfile(){
+  applyLocalProfile();
+  if(window.PixelOfficeP2P && window.PixelOfficeP2P.isStarted() && localRow()){
+    PixelOfficeP2P.broadcastScore(localRow());
+  }
+  renderLeaderboard();renderTiers();renderChat();
+}
+function statusColor(s){return {working:"#5fce7a",thinking:"#c9a227",idle:"#7a6f8f",
+  waiting:"#d84f6f",done:"#5fce7a",gone:"#555"}[s]||"#7a6f8f";}
+
+// ── tier unlock detection + modal ──────────────────────────────────────
+let lastTierT=0, unlockInit=false;
+function myCurrentTier(){
+  if(!state||!state.identity)return null;
+  const board=mergeBoards(currentBoard(),loadCachedBoard());
+  const my=board.find(isMine);
+  return my?(tierForOps(my.ops,my.tools,my.sessions)||null):null;
+}
+function checkTierUnlock(){
+  const t=myCurrentTier();
+  if(!t||!t.t)return;
+  if(!unlockInit){lastTierT=t.t;unlockInit=true;return;} // don't popup for already-earned on load
+  if(t.t>lastTierT){
+    const muted=localStorage.getItem("pixelOfficeTierUnlockMuted")==="1";
+    const auto =localStorage.getItem("pixelOfficeTierAutoIcon")==="1";
+    // "always use new icon": apply it automatically, no prompt needed
+    if(auto && myGitHub())setMyTierIcon(t.icon);
+    // skip the modal when auto-applying the icon OR when muted (don't show again)
+    if(muted || auto){lastTierT=t.t;return;}
+    if(soundOn)chime([660,880,1320,1760]); // tier-up fanfare
+    showUnlockModal(t);
+    lastTierT=t.t;
+  }
+}
+function showUnlockModal(tier){
+  const board=mergeBoards(currentBoard(),loadCachedBoard());
+  const my=board.find(isMine);
+  const curIcon=(my&&my.tierIcon)||"";
+  const el=document.getElementById("unlock");
+  // Which tiers have been unlocked — computed LOCALLY from this user's own
+  // data: every rung from Tier #1 up to (and including) the tier just reached.
+  const tiers=(window.OFFICE_TIERS && window.OFFICE_TIERS.length)
+    ? window.OFFICE_TIERS : (state && state.tiers ? state.tiers : []);
+  const myIdx=Math.max(0,(tier.t||1)-1);
+  const unlocked=tiers.slice(0,myIdx+1);
+  const listHtml=unlocked.map(function(t,i){
+    const cur=i===myIdx;
+    return '<div class="tier-row'+(cur?' me current':'')+'">'+
+      '<span class="tier-rank">#'+t.t+'</span>'+
+      '<img class="tier-ic" src="'+iconPath(t.icon)+'" alt="">'+
+      '<span class="tier-nm">'+esc(t.name)+'</span>'+
+      '<span class="tier-ops"><b>'+fmtNum(t.ops)+'</b> Ops'+(cur?' · you':'')+'</span>'+
+      '</div>';
+  }).join("");
+  el.innerHTML=
+    '<div class="ptitle"><span>TIER UNLOCKED!</span><span class="pclose" data-close="unlock">✕</span></div>'+
+    '<div class="un-body">'+
+      '<div class="un-title">'+esc(tier.name)+' · Tier '+tier.t+'</div>'+
+      '<div class="un-sub">Unlocked '+unlocked.length+' of '+tiers.length+' tiers (#'+(unlocked[0]?unlocked[0].t:1)+' → #'+tier.t+').</div>'+
+      (unlocked.length?'<div class="un-list">'+listHtml+'</div>':'')+
+      '<div class="un-compare">'+
+        '<div class="un-card new"><img src="'+iconPathLarge(tier.icon)+'" alt="" onerror="this.style.display=\'none\'"><span class="un-lbl">New · #'+tier.t+'</span></div>'+
+        '<div class="un-arrow">→</div>'+
+        '<div class="un-card"><img src="'+iconPathLarge(curIcon||tier.icon)+'" alt="" onerror="this.style.display=\'none\'"><span class="un-lbl">'+(curIcon?'Your icon':'New')+'</span></div>'+
+      '</div>'+
+      '<div class="un-btns">'+
+        '<button class="un-btn" id="un-keep">Keep my icon</button>'+
+        '<button class="un-btn primary" id="un-use">Use new icon</button>'+
+      '</div>'+
+      '<label class="un-mute"><input type="checkbox" id="un-auto"> '+
+        'Always use new icon on unlock</label>'+
+      '<label class="un-mute"><input type="checkbox" id="un-mute"> '+
+        'Don\'t show these again (re-enable in Edit Profile)</label>'+
+    '</div>';
+  el.querySelector(".pclose").onclick=()=>togglePanel("unlock",false);
+  document.getElementById("un-keep").onclick=()=>togglePanel("unlock",false);
+  document.getElementById("un-auto").onchange=function(){
+    if(this.checked)localStorage.setItem("pixelOfficeTierAutoIcon","1");
+    else localStorage.removeItem("pixelOfficeTierAutoIcon");
+  };
+  document.getElementById("un-mute").onchange=function(){
+    if(this.checked)localStorage.setItem("pixelOfficeTierUnlockMuted","1");
+    else localStorage.removeItem("pixelOfficeTierUnlockMuted");
+  };
+  document.getElementById("un-use").onclick=()=>{
+    if(myGitHub())setMyTierIcon(tier.icon);
+    togglePanel("unlock",false);
+  };
+  togglePanel("unlock",true);
+}
+function setMyTierIcon(icon){
+  const prof=loadLocalProfile()||{};
+  prof.tierIcon=icon;
+  saveLocalProfile(prof);
+  pushMyProfile();
+  fetch("profile",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({tierIcon:icon})}).catch(()=>{});
+}
 
 // ── office scene ────────────────────────────────────────────────────────
 function drawOffice(w,h){
   for(let y=0;y<h;y+=8)for(let x=0;x<w;x+=8)
-    px(x,y,8,8,((x+y)/8)%2?"#2a2138":"#251d31");
-  px(0,0,w,6,"#3a2f4b"); px(0,6,w,1,"#241c30");            // wall
-  for(let x=14;x<w-14;x+=26){px(x,1,10,4,"#151022");        // windows
-    px(x+1,2,8,2,"#3b5a8f");px(x+2,2,2,1,"#7fa8d8");}
-  // door (agents walk in here)
-  px(1,1,7,6,"#54381f"); px(2,2,5,5,"#6b4a2f"); px(6,4,1,1,"#e8c170");
-  // rug
-  const rw=Math.min(24,w-10); px((w-rw)/2,h-8,rw,5,"#3a2f4b");
-  px((w-rw)/2+1,h-7,rw-2,3,"#443358");
-  // plant, right corner
-  px(w-6,h-14,3,1,"#5fce7a");px(w-7,h-15,2,2,"#5fce7a");px(w-4,h-15,2,2,"#4aa860");
-  px(w-6,h-13,2,3,"#8d5524");px(w-6,h-10,3,1,"#54381f");
-  // water cooler, left side
-  px(2,h-14,4,5,"#7fa8d8");px(3,h-15,2,1,"#a8c8e8");px(2,h-9,4,1,"#4a4a5a");
+    px(x,y,8,8,((x+y)/8)%2?SCENE.cvFloor:SCENE.cvFloorAlt);
+  px(0,0,w,6,SCENE.cvWall); px(0,6,w,1,SCENE.cvWallTrim);            // wall
+  for(let x=14;x<w-14;x+=26){px(x,1,10,4,SCENE.cvWindow);        // windows
+    px(x+1,2,8,2,SCENE.cvWindowGlass);px(x+2,2,2,1,SCENE.cvWindowGlow);}
+  px(1,1,7,6,SCENE.cvDeskDark); px(2,2,5,5,SCENE.cvDesk); px(6,4,1,1,"#e8c170"); // door
+  const rw=Math.min(24,w-10); px((w-rw)/2,h-8,rw,5,SCENE.cvWall);
+  px((w-rw)/2+1,h-7,rw-2,3,SCENE.cvDesk);
+  px(w-6,h-14,3,1,SCENE.cvPlant);px(w-7,h-15,2,2,SCENE.cvPlant);px(w-4,h-15,2,2,SCENE.cvPlantDark);
+  px(w-6,h-13,2,3,SCENE.cvPot);px(w-6,h-10,3,1,SCENE.cvDeskDark);
+  px(2,h-14,4,5,SCENE.cvWindowGlow);px(3,h-15,2,1,"#a8c8e8");px(2,h-9,4,1,"#4a4a5a");
   px(3,h-8,2,2,"#4a4a5a");
-  // coffee machine on a small table, right of door
-  px(10,h-11,6,1,"#6b4a2f");px(10,h-10,6,3,"#54381f");
-  px(11,h-14,4,3,"#33283f");px(12,h-13,1,1,"#d84f6f");
+  px(10,h-11,6,1,SCENE.cvDesk);px(10,h-10,6,3,SCENE.cvDeskDark);
+  px(11,h-14,4,3,SCENE.cvWindow);px(12,h-13,1,1,"#d84f6f");
 }
 function drawDesk(x,y){
-  px(x,y+10,16,1,"#6b4a2f"); px(x,y+11,16,3,"#54381f");
-  px(x+1,y+14,2,4,"#3c2814"); px(x+13,y+14,2,4,"#3c2814");
-  px(x+10,y+4,6,5,"#191524");                    // monitor
+  px(x,y+10,16,1,SCENE.cvDesk); px(x,y+11,16,3,SCENE.cvDeskDark);
+  px(x+1,y+14,2,4,SCENE.cvDeskLeg); px(x+13,y+14,2,4,SCENE.cvDeskLeg);
+  px(x+10,y+4,6,5,SCENE.cvMonitor);
   px(x+12,y+9,2,1,"#4a4a5a");
 }
-// monitor screen color reflects activity
 function deskScreen(x,y,a){
   const t=frame>>3;
-  let col="#0f2c1e";
+  let col=SCENE.cvScreen;
   if(a){
-    if(a.activity==="running")col=(t%4<2)?"#0f3c1e":"#0f2c16";       // terminal green blink
-    else if(a.activity==="browsing")col=(t%6<3)?"#1e2c4a":"#24365a"; // blue page
-    else if(a.activity==="typing")col=(t%2)?"#12321e":"#0f2c1e";     // fast flicker
-    else if(a.status==="waiting")col="#3c1e28";                      // dim red
+    const base=SCENE.cvScreen||"#0f2c1e";
+    if(a.activity==="running")col=(t%4<2)?shadeColor(base,0.25):shadeColor(base,0.1);
+    else if(a.activity==="browsing")col=(t%6<3)?shadeColor(base,-0.2):shadeColor(base,-0.4);
+    else if(a.activity==="typing")col=(t%2)?shadeColor(base,0.15):base;
+    else if(a.status==="waiting")col=shadeColor(base,-0.5);
   }
   px(x+11,y+5,4,3,col);
 }
 
-// ── characters ──────────────────────────────────────────────────────────
 function drawChar(a,fx,fy,seated){
   const h=hash(a.id), skin=SKIN[h%SKIN.length], shirt=SHIRT[(h>>3)%SHIRT.length],
         hair=HAIR[(h>>6)%HAIR.length], t=frame>>4;
@@ -96,38 +971,35 @@ function drawChar(a,fx,fy,seated){
   const bob=((a.status==="working"||walking)&&(t%2))?1:0;
   const x=fx, y=fy+bob;
   if(a.status==="gone")ctx.globalAlpha=0.35;
-  // hair — style varies per agent
   px(x+2,y,4,3,hair);
-  if(h%3===0)px(x+1,y+1,1,2,hair);                 // side hair
-  if(h%5===0)px(x+2,y-1,4,1,hair);                 // tall hair
-  px(x+2,y+2,4,3,skin);                            // face
-  if(h%4===0){px(x+2,y+3,2,1,"#222a44");px(x+4,y+3,2,1,"#222a44")} // glasses
+  if(h%3===0)px(x+1,y+1,1,2,hair);
+  if(h%5===0)px(x+2,y-1,4,1,hair);
+  px(x+2,y+2,4,3,skin);
+  if(h%4===0){px(x+2,y+3,2,1,"#222a44");px(x+4,y+3,2,1,"#222a44")}
   else{px(x+3,y+3,1,1,"#111");px(x+5,y+3,1,1,"#111")}
-  px(x+1,y+5,6,5,shirt);                           // body
-  if(a.kind==="subagent")px(x+1,y+5,6,1,"#e8c170");// gold collar
-  px(x+0,y+6,1,3,skin); px(x+7,y+6,1,3,skin);      // arms
-  if(walking){                                     // legs alternate
+  px(x+1,y+5,6,5,shirt);
+  if(a.kind==="subagent")px(x+1,y+5,6,1,"#e8c170");
+  px(x+0,y+6,1,3,skin); px(x+7,y+6,1,3,skin);
+  if(walking){
     if(t%2){px(x+2,y+10,1,3,"#2d2d3d");px(x+5,y+11,1,2,"#2d2d3d")}
     else{px(x+2,y+11,1,2,"#2d2d3d");px(x+5,y+10,1,3,"#2d2d3d")}
   }else{
     px(x+2,y+10,1,3,"#2d2d3d"); px(x+5,y+10,1,3,"#2d2d3d");
   }
-  // activity props (seated only)
   if(seated){
-    if(a.activity==="typing"&&(frame>>2)%2)px(x+7,y+8,2,1,skin);      // fast hands
+    if(a.activity==="typing"&&(frame>>2)%2)px(x+7,y+8,2,1,skin);
     else if(a.activity==="running"&&t%2)px(x+7,y+8,2,1,skin);
-    else if(a.activity==="reading"){px(x+7,y+7,3,2,"#e8e0c8");px(x+8,y+7,1,2,"#b8b0a0")} // book
-    else if(a.activity==="delegating"&&t%2)px(x+8,y+6,2,1,skin);      // pointing
+    else if(a.activity==="reading"){px(x+7,y+7,3,2,"#e8e0c8");px(x+8,y+7,1,2,"#b8b0a0")}
+    else if(a.activity==="delegating"&&t%2)px(x+8,y+6,2,1,skin);
   }
   ctx.globalAlpha=1;
 }
 function drawBubble(a,x,y){
   const t=frame>>4;
-  if(a.status==="waiting"){                        // needs input — loud
+  if(a.status==="waiting"){
     const by=y-6-((frame>>3)%2);
     px(x+1,by,6,4,"#e8d8b0"); px(x+2,by+4,1,1,"#e8d8b0");
-    px(x+4,by+1,1,2,"#c9302f"); px(x+4,by+3,0,0,"#c9302f");
-    px(x+4,by+3,1,1,"#c9302f");
+    px(x+4,by+1,1,2,"#c9302f"); px(x+4,by+3,1,1,"#c9302f");
   }else if(a.status==="working"&&a.tool){
     px(x+3,y-4,3,3,"#e8c170"); px(x+4,y-3,1,1,"#1a1423");
   }else if(a.status==="thinking"){
@@ -152,10 +1024,8 @@ function label(a,x,y){
     ctx.fillText(a.detail.slice(0,19),(x+8)*S,(y+24.5)*S)}
 }
 
-// ── seats + walking ─────────────────────────────────────────────────────
-// chars: id → {x,y, seat:{x,y}, phase:"in"|"seated"|"out", lastStatus}
 const chars = new Map();
-const WALK = 0.55;                                  // grid cells per frame
+const WALK = 0.55;
 function seatPos(i,perRow){
   return {x:10+(i%perRow)*34, y:14+Math.floor(i/perRow)*32};
 }
@@ -171,7 +1041,6 @@ function stepChars(perRow){
     const dx=tx-c.x, dy=ty-c.y, d=Math.hypot(dx,dy);
     if(d<WALK){ c.x=tx;c.y=ty; if(c.phase==="in")c.phase="seated"; }
     else { c.x+=dx/d*WALK; c.y+=dy/d*WALK; }
-    // sound triggers on status transitions
     if(c.lastStatus!==a.status){
       if(a.status==="waiting")chime([880,660,880]);
       else if(a.status==="done"&&a.kind==="subagent")chime([520,780]);
@@ -188,7 +1057,6 @@ function stepChars(perRow){
   }
 }
 
-// ── sound (off by default; toggle persists) ─────────────────────────────
 let soundOn=false, audioCtx=null;
 try{soundOn=localStorage.getItem("pixelOfficeSound")==="1"}catch(e){}
 function chime(notes){
@@ -213,17 +1081,1066 @@ sBtn.onclick=()=>{soundOn=!soundOn;
   if(soundOn)chime([660]); syncSoundBtn()};
 syncSoundBtn();
 
-// ── + agent button (VS Code only) ───────────────────────────────────────
 const spawnBtn=document.getElementById("spawn");
 if(IN_VSCODE){spawnBtn.style.display="";
   spawnBtn.onclick=()=>vsapi.postMessage({type:"spawnAgent"});}
+
+// ── panels: open/close ─────────────────────────────────────────────────
+function togglePanel(id,force){
+  const el=document.getElementById(id);
+  const was=el.classList.contains("open");
+  if(force===true&&was)return; if(force===false&&!was)return;
+  el.classList.toggle("open",force===undefined?!was:force);
+  if(id==="lb")document.getElementById("lbBtn").classList.toggle("on",el.classList.contains("open"));
+  if(id==="mb")document.getElementById("mbBtn").classList.toggle("on",el.classList.contains("open"));
+  if(id==="chat")document.getElementById("chatBtn").classList.toggle("on",el.classList.contains("open"));
+  if(id==="tiers")document.getElementById("tiersBtn").classList.toggle("on",el.classList.contains("open"));
+}
+document.querySelectorAll(".pclose").forEach(b=>b.onclick=()=>togglePanel(b.dataset.close,false));
+document.getElementById("lbBtn").onclick=()=>togglePanel("lb");
+document.getElementById("mbBtn").onclick=()=>togglePanel("mb");
+document.getElementById("chatBtn").onclick=()=>togglePanel("chat");
+document.getElementById("tiersBtn").onclick=()=>togglePanel("tiers");
+document.getElementById("aboutBtn").onclick=()=>{
+  const vEl=document.getElementById("about-version");
+  if(vEl) vEl.textContent=OFFICE_VERSION;
+  togglePanel("about");
+};
+document.getElementById("gh-chip").onclick=()=>{
+  // when connected, clicking your name in the top bar opens your profile
+  if(myGitHub()){showProfile(myGitHub());}else{togglePanel("gh-connect");}
+};
+
+// ── click-outside closes modals ──────────────────────────────────────────
+// If a profile modal (or any panel) is open and the user clicks anywhere
+// outside that panel, close it. The panel-toggle buttons in the top bar are
+// excluded so their own handlers keep toggling correctly.
+const PANEL_TRIGGERS = "#lbBtn,#mbBtn,#chatBtn,#tiersBtn,#aboutBtn,#gh-chip";
+document.addEventListener("click", function (e) {
+  const t = e.target;
+  if (t && t.closest && t.closest(PANEL_TRIGGERS)) return; // let the toggle button handle it
+  document.querySelectorAll(".panel.open").forEach(function (p) {
+    if (!p.classList.contains("open")) return;
+    if (t && t.closest && t.closest("#" + p.id)) return;   // click is inside this panel
+    togglePanel(p.id, false);
+  });
+}, true);
+
+// ── leaderboard ────────────────────────────────────────────────────────
+function tierRowHtml(r){
+  const dev=isDev(r.github), me=isMine(r);
+  const tier=(r.tier&&r.tier.t)?r.tier:(tierForOps(r.ops,r.tools,r.sessions)||{name:"—",icon:"",t:1});
+  const tIcon=rowTierIcon(r)||tier.icon||"";
+  return '<div class="lb-row'+(me?" me":"")+'" data-id="'+esc(r.id)+'">'+
+    '<span class="lb-rank'+(r.rank<=3?" top":"")+'">'+r.rank+'</span>'+
+    '<span class="lb-tiernum">#'+esc(tier.t||"")+'</span>'+
+    '<img class="lb-tier" src="'+iconPath(tIcon)+'" alt="" onerror="this.style.visibility=\'hidden\'">'+
+    '<span class="lb-name'+(dev?" dev":"")+'">'+esc(r.name)+
+      (dev?'<span class="lb-dev">DEV</span>':'')+'</span>'+
+    '<span class="lb-stats">'+
+      '<span class="lb-meta">'+fmtNum(r.tools)+' calls · '+fmtTime(r.time_s)+'</span>'+
+      '<span class="lb-ops"><b>'+fmtNum(r.ops)+'</b><span class="lbl">Ops · '+esc(tier.name)+'</span></span>'+
+    '</span>'+
+    '</div>';
+}
+// ── merged leaderboard (local live score + P2P peer scores) ────────────
+const LS_BOARD = "pixelOfficeBoard";
+function localRow(){
+  const r=(state && state.leaderboard && state.leaderboard[0]) || null;
+  if(r) r.modelboard = (state && state.modelboard) || null;
+  return r;
+}
+function currentBoard(){
+  if(window.PixelOfficeP2P && PixelOfficeP2P.isStarted()){
+    return PixelOfficeP2P.getLeaderboard(localRow());
+  }
+  return (state && state.leaderboard) || [];
+}
+function mergeBoards(live, cached){
+  // LIVE (real-time) wins over the last-known cached board. Rows are keyed by
+  // GitHub username (case-insensitive), NOT by the row `id` — the same account
+  // legitimately comes back through several sources (the server fold, P2P peer
+  // entries, the gist snapshot and the localStorage cache), each carrying a
+  // different per-browser/per-agent `id`. Keying by `id` was duplicating the
+  // same person. Keying by GitHub collapses every source to ONE authoritative
+  // row per account, so the local user can't dupe their own score when their
+  // row also comes back from server/gist scores. Only GitHub usernames appear —
+  // any row without a github handle (cached agents, legacy local rows) is
+  // dropped so agents never show up on the leaderboard.
+  const m=new Map();
+  const feed=(cached||[]).concat(live||[]);
+  for(const r of feed){
+    if(!r || !(r.github)) continue;
+    const key=String(r.github).toLowerCase();
+    const prev=m.get(key);
+    if(!prev){ m.set(key,r); continue; }
+    // Prefer the fresher/higher-scoring row for that user so a stale cache
+    // entry never clobbers a live fold or peer superset.
+    if((r.ops||0)>(prev.ops||0)) m.set(key,r);
+  }
+  const rows=[...m.values()];
+  rows.sort((a,b)=>(b.ops-a.ops)||(b.tools-a.tools));
+  rows.forEach((r,i)=>r.rank=i+1);
+  return rows;
+}
+function loadCachedBoard(){ try{return JSON.parse(localStorage.getItem(LS_BOARD)||"[]")}catch(e){return []} }
+function saveCachedBoard(rows){ try{localStorage.setItem(LS_BOARD,JSON.stringify(rows.slice(0,50)))}catch(e){} }
+// _lbHTML caches the last-rendered board. renderLeaderboard() is called on
+// every poll tick + every P2P score packet; skipping the DOM rebuild when the
+// rows are unchanged stops the tier icons from flickering (they were being
+// recreated on each call, re-triggering image load/decode).
+let _lbHTML=null;
+function renderLeaderboard(){
+  const el=document.getElementById("lb-list");
+  const board=mergeBoards(currentBoard(),loadCachedBoard());
+  if(!board.length){
+    const h='<div class="pempty">connect a GitHub username to show on the leaderboard</div>';
+    if(el.innerHTML!==h)el.innerHTML=h;
+    _lbHTML=null;return;
+  }
+  const html=board.map(tierRowHtml).join("");
+  if(html===_lbHTML)return;
+  _lbHTML=html;
+  el.innerHTML=html;
+  el.querySelectorAll(".lb-row").forEach(row=>{
+    row.onclick=()=>showProfile(row.dataset.id);
+  });
+}
+
+// ── model leaderboard (jekyll-hyde audit data) ────────────────────────
+// Ranks MODELS by how much Hyde has had to correct them. The server sorts
+// fewest-first, so the most-corrected model sinks to the BOTTOM. Each row
+// shows the audit breakdown (sandbagged / genuine / uncertain) plus a streak.
+// pixel-office only SUPPORTS the audit engine — if jekyll-hyde isn't
+// installed we show a CTA linking to the plugin so people can contribute.
+const JH_REPO = "https://github.com/jnorthrup/hermes-jekyl-hyde";
+// ── ChatGPT model roster ────────────────────────────────────────────────
+// The Model Leaderboard always lists every known ChatGPT model (shown with 0
+// corrections even before Jekyll-Hyde has audited it) and resolves any raw
+// provider-prefixed id that belongs to a ChatGPT model to its proper display
+// name instead of rendering a bare "unknown" / routing path.
+const CHATGPT_MODELS = [
+  "gpt-5.5","gpt-5.4","gpt-5.3","gpt-5.2","gpt-5.1","gpt-5",
+  "gpt-4o-mini","gpt-4o","gpt-4.1-nano","gpt-4.1-mini","gpt-4.1",
+  "gpt-4-turbo","gpt-4","gpt-3.5-turbo"
+];
+const CHATGPT_SET = new Set(CHATGPT_MODELS);
+// Longest-first so a prefix like "gpt-4o-mini" wins over "gpt-4o".
+const CHATGPT_SORTED = CHATGPT_MODELS.slice().sort(function(a,b){return b.length-a.length;});
+const CHATGPT_ALIAS = { "gpt4o":"gpt-4o", "gpt4o-mini":"gpt-4o-mini", "chatgpt-4o":"gpt-4o", "o3":"gpt-5", "o4-mini":"gpt-4o-mini" };
+// Normalize any raw model id to a canonical ChatGPT model id, or null if it
+// isn't a ChatGPT model. Strips provider prefixes the same way jekyll-hyde does
+// (openrouter/authors/model, custom:model, provider/model → last segment).
+function canonicalModelId(raw){
+  if(!raw) return null;
+  let id=String(raw).trim().toLowerCase();
+  if(!id || id==="unknown"||id==="none"||id==="null") return null;
+  if(id.indexOf("openrouter/")===0) id=id.slice("openrouter/".length);
+  id=id.split(/[/:]/).pop();
+  if(id.indexOf("chatgpt-")===0) id="gpt-"+id.slice("chatgpt-".length);
+  if(!id) return null;
+  if(CHATGPT_ALIAS[id]) return CHATGPT_ALIAS[id];
+  if(CHATGPT_SET.has(id)) return id;
+  for(const m of CHATGPT_SORTED){ if(id.indexOf(m)===0) return m; }
+  return null;
+}
+function modelDisplayName(raw){
+  const canon=canonicalModelId(raw);
+  if(canon) return canon;
+  const s=String(raw||"").trim();
+  if(!s || s==="unknown"||s==="none"||s==="null") return "";
+  return s;
+}
+// Merge this machine's local modelboard with every peer's modelboard that
+// arrived over the P2P score packets into a single shared Model Leaderboard.
+// A model's corrections are summed across contributors (it's the same model
+// name everywhere), and the board is re-sorted fewest-first so the
+// most-corrected model sinks to the bottom.
+function mergedModelBoard(){
+  const local=(state && state.modelboard) || {};
+  // The local user's own github. Their local board is authoritative, so any
+  // peer/gist copy of THEIR modelboard is ignored — this is what prevents the
+  // "duplicate packet + local" bug where the same board (local /state + the
+  // local row riding inside a peer packet) gets summed twice and doubles the
+  // corrections.
+  const lb=state && state.leaderboard && state.leaderboard[0];
+  const localGh=lb && lb.github ? String(lb.github).toLowerCase() : "";
+  const rows=new Map();
+  function fold(mb){
+    if(!mb || !mb.installed) return;
+    (mb.models||[]).forEach(function(r){
+      // Fold real data onto the canonical model id so a ChatGPT model's
+      // corrections land on the right roster row (not a bare "unknown").
+      // Rows whose model can't be named are skipped entirely — Models.dev
+      // names every real model, so an "unknown" row is stale by definition.
+      const canon=canonicalModelId(r.model);
+      const key=canon || String(r.model||"").trim();
+      if(!key || key==="unknown"||key==="none"||key==="null") return;
+      const cur=rows.get(key) || {model:key, corrections:0, sandbagged:0,
+        genuine:0, uncertain:0, escalated:0, last_corrected:0, streak:0};
+      cur.corrections+=r.corrections; cur.sandbagged+=r.sandbagged;
+      cur.genuine+=r.genuine; cur.uncertain+=r.uncertain; cur.escalated+=r.escalated;
+      if(r.last_corrected>cur.last_corrected)cur.last_corrected=r.last_corrected;
+      cur.streak+=r.streak;
+      rows.set(key,cur);
+    });
+  }
+  const folded=new Set();           // modelboard objects already folded
+  if(local && local.installed){ fold(local); folded.add(local); }
+  currentBoard().forEach(function(r){
+    const mb=r.modelboard||null;
+    if(!mb || !mb.installed) return;
+    if(folded.has(mb)) return;                          // same object as local board
+    if(r.github && String(r.github).toLowerCase()===localGh) return; // local user's own copy
+    folded.add(mb); fold(mb);
+  });
+  const out=[...rows.values()].filter(function(r){
+    // Hide rows with no data (0 corrections, 0 verdicts) — placeholder roster
+    // entries or models merely reported-but-never-audited shouldn't clutter the
+    // board.
+    return (r.corrections||0)!==0 || (r.sandbagged||0)!==0 ||
+           (r.genuine||0)!==0 || (r.uncertain||0)!==0;
+  });
+  out.sort(function(a,b){
+    return (a.corrections-b.corrections)||(a.sandbagged-b.sandbagged)||
+           (a.escalated-b.escalated)||String(a.model).localeCompare(String(b.model));
+  });
+  out.forEach(function(r,i){r.rank=i+1;});
+  // Only claim "installed" if Jekyll-Hyde (local or any peer) is actually
+  // present — otherwise keep the install CTA instead of showing an empty roster.
+  const installed=(local && local.installed) ||
+    currentBoard().some(function(r){return r.modelboard && r.modelboard.installed;});
+  return {installed: installed, models:out};
+}
+// _mbHTML caches the last-rendered board (same flicker-guard as the leaderboard).
+let _mbHTML=null;
+function renderModelBoard(){
+  const el=document.getElementById("mb-list");
+  if(!el)return;
+  const mb=mergedModelBoard();
+  const installed=mb.installed;
+  const models=mb.models || [];
+  let html;
+  if(!installed){
+    html='<div class="mb-empty">The Model Leaderboard is powered by the Jekyll-Hyde audit engine — install it to start recording corrections.</div>'+
+      '<div class="mb-cta"><a class="ab-link" href="'+JH_REPO+'" target="_blank" rel="noopener"><img src="https://cdn.simpleicons.org/github/181717" alt="" onerror="this.style.display=\'none\'"> To contribute, download Jekyll-Hyde</a></div>';
+  }else if(!models.length){
+    html='<div class="mb-empty">Jekyll-Hyde is installed but hasn\'t audited a model yet — it records a correction every time it activates.</div>'+
+      '<div class="mb-cta"><a class="ab-link" href="'+JH_REPO+'" target="_blank" rel="noopener"><img src="https://cdn.simpleicons.org/github/181717" alt="" onerror="this.style.display=\'none\'"> Jekyll-Hyde</a></div>';
+  }else{
+    const rows=models.map(r=>{
+      const top=r.rank<=3;
+      const clean=esc(modelDisplayName(r.model) || String(r.model||"").trim() || "?");
+      const last=r.last_corrected?' · '+timeAgo(r.last_corrected):'';
+      return '<div class="mb-row">'+
+        '<span class="mb-rank'+(top?" top":"")+'">'+r.rank+'</span>'+
+        '<span class="mb-name">'+clean+'</span>'+
+        '<span class="mb-stats">'+
+          '<span class="mb-break"><span class="mb-ver sbg">'+fmtNum(r.sandbagged)+' sandbag</span>'+
+            '<span class="mb-sep">·</span><span class="mb-ver gen">'+fmtNum(r.genuine)+' genuine</span>'+
+            '<span class="mb-sep">·</span><span class="mb-ver unc">'+fmtNum(r.uncertain)+' ?</span></span>'+
+          '<span class="mb-corr"><b>'+fmtNum(r.corrections)+'</b><span class="lbl">'+(r.corrections===1?'correction':'corrections')+(last||'')+'</span></span>'+
+        '</span>'+
+        '</div>';
+    }).join("");
+    html=rows+'<div class="mb-cta"><a class="ab-link" href="'+JH_REPO+'" target="_blank" rel="noopener"><img src="https://cdn.simpleicons.org/github/181717" alt="" onerror="this.style.display=\'none\'"> To contribute, download Jekyll-Hyde</a></div>';
+  }
+  if(html===_mbHTML)return;
+  _mbHTML=html;
+  el.innerHTML=html;
+}
+function timeAgo(ts){
+  const s=Math.floor((Date.now()/1000)-ts);
+  if(s<60)return "just now";
+  if(s<3600)return Math.floor(s/60)+"m ago";
+  if(s<86400)return Math.floor(s/3600)+"h ago";
+  return Math.floor(s/86400)+"d ago";
+}
+
+// ── profile card ───────────────────────────────────────────────────────
+// Maps a user's profileTheme onto the #prof popup (scoped CSS vars so the
+// rest of the UI keeps the viewer's own interface theme).
+// Perceived brightness of a hex colour 0..1 (0 = black, 1 = white).
+function hexBrightness(hex){
+  let h=String(hex||"#000000").replace(/^#/,"");
+  if(h.length===3)h=h.split("").map(c=>c+c).join("");
+  if(h.length!==6)return 0;
+  const r=parseInt(h.slice(0,2),16)||0, g=parseInt(h.slice(2,4),16)||0, b=parseInt(h.slice(4,6),16)||0;
+  return (0.299*r+0.587*g+0.114*b)/255;
+}
+function applyProfileTheme(el,theme){
+  theme=theme||{};
+  const accent=(theme.color||theme.accent||"#e8c170");
+  el.style.setProperty("--border",theme.border||accent);
+  el.style.setProperty("--accent",accent);
+  el.style.setProperty("--panel",theme.bg||"");
+  el.style.setProperty("--panel2",theme.bg||"");
+  el.style.setProperty("--text",theme.text||"");
+  el.style.setProperty("--sub",theme.sub||"");
+  el.style.setProperty("--link",theme.link||"");
+  el.style.setProperty("--green",theme.green||"");
+  el.style.setProperty("--dev",theme.dev||"");
+  // Theme the popup's line separators (--borderDim), stat-box backgrounds
+  // (--bg) and link hover so the whole card follows the profile theme rather
+  // than inheriting the viewer's interface theme.
+  const pbg=theme.bg||"";
+  const pborder=theme.border||accent;
+  const plink=theme.link||accent;
+  el.style.setProperty("--bg", pbg?mixHex(pbg,"#000000",0.38):"");
+  el.style.setProperty("--borderDim", pborder?mixHex(pborder,"#000000",0.5):"");
+  el.style.setProperty("--linkHover", plink?mixHex(plink,"#ffffff",0.35):"");
+  // Invert the GitHub logo to white when the profile background is dark
+  // (<50% brightness). Unset bg falls back to the dark default panel.
+  el.classList.toggle("dark-bg", hexBrightness(theme.bg)<0.5);
+  // DEV rainbow: animated rainbow border (overrides border color) + name.
+  if(theme.rainbow){
+    el.classList.add("rainbow-border");
+    const n=el.querySelector(".pc-name");
+    if(n)n.classList.add("rainbow-name");
+  }else{
+    el.classList.remove("rainbow-border");
+    const n=el.querySelector(".pc-name");
+    if(n)n.classList.remove("rainbow-name");
+  }
+}
+// map raw tool names to a short human label for the live AGENTS roster
+function agentActLabel(a){
+  const t=(a.tool||a.activity||"").toLowerCase();
+  if(!t)return (a.status||"idle");
+  if(t.includes("read")||t.includes("view")||t.includes("search")||t.includes("find"))return "reading";
+  if(t.includes("patch")||t.includes("write")||t.includes("edit")||t.includes("replace"))return "editing";
+  if(t.includes("terminal")||t.includes("exec")||t.includes("shell")||t.includes("command"))return "running";
+  if(t.includes("delegate")||t.includes("task")||t.includes("subagent"))return "delegating";
+  if(t.includes("fact")||t.includes("memory"))return "memory";
+  if(t.includes("image")||t.includes("vision"))return "imaging";
+  if(t.includes("web")||t.includes("fetch")||t.includes("url"))return "browsing";
+  if(t.includes("tts")||t.includes("audio")||t.includes("voice"))return "audio";
+  if(t.includes("cron"))return "scheduling";
+  return t.replace(/_/g," ").slice(0,16);
+}
+// re-render just the live AGENTS roster on the open profile popup
+function refreshProfileAgents(){
+  const pp=document.getElementById("prof");
+  if(!pp||!pp.classList.contains("open"))return;
+  const curId=pp.dataset.curId;
+  if(!curId)return;
+  const board=mergeBoards(currentBoard(),loadCachedBoard());
+  const r=board.find(x=>x.id===curId||x.github===curId);
+  if(!r)return;
+  const activeAgents=(r.agents||[]).filter(a=>a.status && a.status!=="idle" && a.status!=="gone");
+  const box=document.getElementById("pc-aglist");
+  if(!box)return;
+  box.innerHTML=activeAgents.length
+    ? activeAgents.map(a=>
+        '<div class="pc-ag"><span class="ag-dot" style="background:'+statusColor(a.status)+'"></span>'+
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+esc(a.label)+'</span>'+
+        '<span class="ag-st">'+esc(agentActLabel(a))+'</span></div>').join("")
+    : '<div style="color:var(--sub);font-size:.833em">no active agents</div>';
+}
+let profileTimer=null;
+function startProfileTimer(){
+  stopProfileTimer();
+  profileTimer=setInterval(refreshProfileAgents,2000);
+}
+function stopProfileTimer(){
+  if(profileTimer){clearInterval(profileTimer);profileTimer=null;}
+}
+// True while the profile/edit panel is open, so the periodic /state poll does
+// NOT re-apply the server's saved interface theme on top of a live preview.
+let editPanelOpen=false;
+function showProfile(id){
+  const board=mergeBoards(currentBoard(),loadCachedBoard());
+  const r=board.find(x=>x.id===id||x.github===id);
+  if(!r)return;
+  const dev=isDev(r.github), mine=isMine(r);
+  const tier=(r.tier&&r.tier.t)?r.tier:(tierForOps(r.ops,r.tools,r.sessions)||{name:"—",icon:"",t:1});
+  const tierIcon=rowTierIcon(r)||tier.icon||"";
+  const avatar=ghAvatarFor(r);
+  const theme=r.profileTheme||{};
+  const accent=(theme.color||theme.accent||"#e8c170");
+  const nameColor=dev?"var(--dev)":accent;
+  const links=normalizeLinks(r.links);
+  const bio=(r.bio||"").trim();
+  let linksHtml="";
+  links.forEach(l=>{
+    const pkey=l.platform||"github";
+    linksHtml+='<a class="pc-link" href="'+esc(l.url)+'" target="_blank" rel="noopener">'+
+      '<img src="'+linkIcon(pkey)+'" alt="" onerror="this.style.display=\'none\'">'+esc(linkDisplayName(pkey,l.url))+'</a>';
+  });
+  document.getElementById("prof").innerHTML=
+    '<div class="ptitle"><span>PROFILE · '+r.rank+'</span><span class="pclose" data-close="prof">✕</span></div>'+
+    '<div class="pc-head">'+
+      (avatar?'<img class="pc-av" src="'+esc(avatar)+'" alt="" onerror="this.style.display=\'none\'">':'<div class="pc-av gh"></div>')+
+      '<div class="pc-tierbox"><img class="pc-tiermax" src="'+iconPathLarge(tierIcon)+'" alt="" onerror="this.style.display=\'none\'">'+
+        '<span class="pc-tiernum">#'+(tier.t||"")+'</span></div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div class="pc-name'+(dev?" dev":"")+'" style="color:'+nameColor+'">'+esc(r.name)+
+          (dev?' <span class="lb-dev">DEV</span>':'')+'</div>'+
+        (dev?'<div class="pc-devtitle">Multiplayer Fork Developer</div>':'')+
+        '<div class="pc-sub">'+esc(tier.name||"")+' · Tier '+(tier.t||"")+'</div>'+
+        '<a class="pc-ghlink" href="https://github.com/'+esc(r.github)+'" target="_blank" rel="noopener">'+
+        '<svg class="gh-icon" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg> '+esc(r.github||"GitHub")+' ↗</a>'+
+      '</div></div>'+
+    (bio?'<div class="pc-bio">'+esc(bio)+'</div>':'')+
+    (linksHtml?'<div class="pc-links">'+linksHtml+'</div>':'')+
+    '<div class="pc-stats">'+
+      '<div class="pc-stat"><div class="lbl">OPS</div><div class="val gold">'+fmtNum(r.ops)+'</div></div>'+
+      '<div class="pc-stat"><div class="lbl">TOOL CALLS</div><div class="val">'+fmtNum(r.tools)+'</div></div>'+
+      '<div class="pc-stat"><div class="lbl">SESSIONS</div><div class="val">'+fmtNum(r.sessions)+'</div></div>'+
+      '<div class="pc-stat"><div class="lbl">TIME RAN</div><div class="val">'+fmtTime(r.time_s)+'</div></div>'+
+      '</div>'+
+    (mine?'<div class="pc-actions"><button class="pc-editbtn" id="edit-profile-btn">✎ Edit Profile</button></div>':'')+
+    '<div class="pc-agents"><b>AGENTS</b><div id="pc-aglist"></div></div>';
+  // theme the popup itself with this user's profile accent (border + accent
+  // vars only on the #prof subtree so the rest of the UI is untouched)
+  const profEl=document.getElementById("prof");
+  profEl.dataset.curId=r.id||r.github||"";
+  applyProfileTheme(profEl,theme);
+  const pclose=document.getElementById("prof").querySelector(".pclose");
+  pclose.onclick=()=>{stopProfileTimer();togglePanel("prof",false);};
+  const eb=document.getElementById("edit-profile-btn");
+  if(eb)eb.onclick=()=>{stopProfileTimer();togglePanel("prof",false);openEditProfile(r);};
+  refreshProfileAgents();
+  togglePanel("prof",true);
+  startProfileTimer();
+}
+
+// ── profile editing ───────────────────────────────────────────────────
+function linkRowHtml(platform, val){
+  const p=LINK_PLATFORMS.find(x=>x.key===platform)||LINK_PLATFORMS[0];
+  const opts=LINK_PLATFORMS.map(x=>'<option value="'+x.key+'"'+(x.key===p.key?' selected':'')+'>'+esc(x.name)+'</option>').join("");
+  return '<div class="ed-linkrow" draggable="true">'+
+    '<span class="ed-drag" title="drag to reorder">⠿</span>'+
+    '<select class="ed-platform" title="platform">'+opts+'</select>'+
+    '<img class="ed-picon" src="'+linkIcon(p.key)+'" alt="" onerror="this.style.display=\'none\'">'+
+    '<input class="ed-url" type="url" placeholder="https://..." value="'+esc(val||"")+'">'+
+    '<button class="ed-del" title="remove">✕</button></div>';
+}
+function openEditProfile(r){
+  const mine=myGitHub();
+  if(!mine)return;
+  editPanelOpen=true;
+  const links=r.links||{};
+  let editBio=r.bio||"";
+  let editTier=r.tierIcon||"";
+  let editProf=Object.assign({},r.profileTheme||{});
+  let editIface=Object.assign({},THEME_DEFAULTS,r.interfaceTheme||{});
+  // snapshot the currently-applied interface theme so cancelling (X) reverts
+  const baseIface=lastAppliedTheme?Object.assign({},lastAppliedTheme):null;
+  // Pre-fill the GitHub link from the authenticated GitHub username (set by
+  // the gh CLI login / /auth/login) if the user hasn't added one yet. They can
+  // still add more links afterwards.
+  const mygh=myGitHub();
+  let prefill=normalizeLinks(links);
+  const hasGithub=prefill.some(l=>l.platform==="github");
+  if(mygh && !hasGithub){
+    prefill=prefill.concat([{platform:"github",url:"https://github.com/"+encodeURIComponent(mygh)}]);
+  }
+  // Links live in a single flat, order-preserving list so drag-and-drop can
+  // freely reorder them across platforms.
+  let linksHtml='<div class="ed-section"><h4>Links</h4>'+
+    '<div class="ed-links" id="ed-links">'+
+    prefill.map(l=>linkRowHtml(l.platform||"github",l.url)).join("")+
+    '</div><button class="ed-add" data-add="__any">+ Add link</button></div>';
+
+  // Interface theme colors grouped by the surface they affect. Each group
+  // carries a preset dropdown (INTERFACE_PRESETS[key]) that fills its colors.
+  const themeGroups=[
+    ["main","Main interface",[["bg","Background"],["panel","Panel BG"],["panel2","Button BG"],
+      ["panelHover","Hover BG"],["border","Border"],["borderDim","Row Border"],
+      ["accent","Highlight"],["text","Font Color"],["sub","Sub-fonts"],
+      ["chip","Current Player"],["on","Enabled Buttons"],["scroll","Scrollbar"]]],
+    ["leaderboard","Leaderboard",[["rowMe","Your Row"],["rowCurrent","Current Rung"],
+      ["green","Status Green"],["dev","DEV Gold"]]],
+    ["chat","Chat box",[["link","Link Color"],["linkHover","Link Hover"],["time","Timestamps"]]],
+    ["canvas","Canvas / Scene",[["cvFloor","Floor"],["cvFloorAlt","Floor Alt"],["cvWall","Wall"],
+      ["cvWallTrim","Wall Trim"],["cvWindow","Window Frame"],["cvWindowGlass","Window Glass"],
+      ["cvWindowGlow","Window Glow"],["cvDesk","Desk"],["cvDeskDark","Desk Dark"],
+      ["cvDeskLeg","Desk Leg"],["cvMonitor","Monitor"],["cvScreen","Screen"],
+      ["cvPlant","Plant"],["cvPlantDark","Plant Dark"],["cvPot","Pot"]]],
+    ["agents","Pixel Agents",[["agSkin","Skin"],["agShirt","Shirt"],["agHair","Hair"]]],
+    ["other","Other",[["danger","Error Red"]]]
+  ];
+  let themeHtml=themeGroups.map(([gkey,cat,items])=>{
+    const presets=INTERFACE_PRESETS[gkey]||[];
+    const presetOpts=presetOptionsHtml(presets);
+    return '<div class="ed-cat">'+esc(cat)+'</div>'+
+      '<select class="ed-preset" data-preset-cat="'+gkey+'">'+presetOpts+'</select>'+
+      '<details class="ed-custom"><summary>Custom</summary><div class="ed-custom-body">'+
+      items.map(([k,label])=>
+        '<div class="ed-theme-row"><label>'+label+'</label>'+
+        '<input type="color" data-theme="'+k+'" value="'+esc(editIface[k]||THEME_DEFAULTS[k])+'"></div>'
+      ).join("")+'</div></details>';
+  }).join("");
+  themeHtml+='<div class="ed-theme-row"><label>Font size (px)</label>'+
+    '<input type="number" data-theme="fontSize" min="8" max="30" value="'+(editIface.fontSize||THEME_DEFAULTS.fontSize)+'"></div>';
+  themeHtml+='<div class="ed-theme-row"><label>Font family</label>'+
+    '<select class="ed-input" data-theme="font">'+
+      FONT_OPTIONS.map(o=>'<option value="'+esc(o.value)+'"'+
+        ((editIface.font||THEME_DEFAULTS.font)===o.value||(editIface.font&&editIface.font.indexOf(o.value.replace(/'/g,""))>-1&&editIface.font.indexOf(o.value.split(",")[0].replace(/'/g,""))>-1)?' selected':'')+
+        '>'+esc(o.label)+'</option>').join("")+
+    '</select></div>';
+
+  const avatar=ghAvatarFor(mine);
+  const el=document.getElementById("edit");
+  el.innerHTML=
+    '<div class="ptitle"><span>EDIT PROFILE — '+esc(mine)+'</span><span class="pclose" data-close="edit">✕</span></div>'+
+    '<div class="ed-scroll">'+
+      '<div class="ed-section">'+
+        '<span class="ed-label">GITHUB AVATAR (from GitHub)</span>'+
+        (avatar?'<img src="'+esc(avatar)+'" alt="" onerror="this.style.display=\'none\'" style="width:56px;height:56px;border-radius:50%;image-rendering:pixelated;border:2px solid var(--border);display:block">':'')+
+        '<span class="ed-label">BIO</span>'+
+        '<textarea class="ed-input" id="ed-bio" placeholder="Say something about yourself..."></textarea>'+
+      '</div>'+
+      '<div class="ed-section">'+
+        '<span class="ed-label">TIER ICON (shown on your profile / leaderboard / chat)</span>'+
+        '<div class="ed-tierpick" id="ed-tierpick"></div>'+
+      '</div>'+
+      '<div class="ed-section">'+linksHtml+'</div>'+
+      '<div class="ed-section">'+
+        '<h4>Profile Theme</h4>'+
+        (isDev(mine)?'<label class="ed-label" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+          '<input type="checkbox" id="ed-rainbow" style="width:auto;margin:0" '+
+          (editProf.rainbow?'checked':'')+'> Rainbow border (DEV)</label>':'')+
+        '<select class="ed-preset" id="ed-profpreset">'+presetOptionsHtml(PROFILE_PRESETS)+'</select>'+
+        '<details class="ed-custom"><summary>Custom</summary>'+
+          '<div class="ed-custom-body" id="ed-profilethemelist"></div>'+
+        '</details>'+
+      '</div>'+
+      '<div class="ed-section">'+
+        '<h4>Interface Theme</h4>'+
+        '<div class="ed-master">Master Theme</div>'+
+        '<select class="ed-preset" id="ed-masterpreset">'+presetOptionsHtml(INTERFACE_PRESETS.main)+'</select>'+
+        '<details class="ed-subthemes"><summary>Sub-Themes</summary><div class="ed-subthemes-body">'+
+        '<div id="ed-themelist">'+themeHtml+'</div>'+
+        '</div></details>'+
+      '</div>'+
+      '<div class="ed-section">'+
+        '<label class="ed-label" style="display:flex;align-items:center;gap:8px;margin-bottom:0">'+
+        '<input type="checkbox" id="ed-tierunlock" style="width:auto;margin:0"> '+
+        'Enable tier unlock notifications</label>'+
+        '<label class="ed-label" style="display:flex;align-items:center;gap:8px;margin-bottom:0;margin-top:6px">'+
+        '<input type="checkbox" id="ed-tierauto" style="width:auto;margin:0"> '+
+        'Always use new icon on unlock</label>'+
+      '</div>'+
+      '<div class="ed-section" style="border:none">'+
+        '<button class="ed-save" id="ed-save">Save Profile</button>'+
+        '<button class="ed-logout" id="ed-logout">Log out</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="ed-status" id="ed-status"></div>';
+  document.getElementById("ed-bio").value=editBio;
+
+  // Profile theme color switchers (accent, border, popup bg, text, sub, link,
+  // green, dev) grouped under "Profile Theme". Values map onto the #prof popup.
+  const PROFILE_THEME_ITEMS=[["color","Accent"],["border","Border"],["bg","Popup BG"],
+    ["text","Font Color"],["sub","Sub-fonts"],["link","Link Color"],
+    ["green","Status Green"],["dev","DEV Gold"]];
+  const profThemeHtml=PROFILE_THEME_ITEMS.map(([k,label])=>{
+    const base=(k==="color")?editProf.color:(editProf[k]||(k==="border"?editProf.color:""));
+    return '<div class="ed-theme-row"><label>'+label+'</label>'+
+      '<input type="color" data-proftheme="'+k+'" value="'+esc(base||(k==="color"?"#e8c170":"#e8c170"))+'"></div>';
+  }).join("");
+  document.getElementById("ed-profilethemelist").innerHTML=profThemeHtml;
+
+  const pick=document.getElementById("ed-tierpick");
+  // Only tiers up to and including the user's current tier are unlocked.
+  const curTier=myTierName()||tierForOps(r.ops,r.tools,r.sessions);
+  const unlockedT=curTier?curTier.t:0;
+  (window.OFFICE_TIERS||[]).forEach(t=>{
+    const cell=document.createElement("div");
+    const locked=!(t.t<=unlockedT) && !(t.icon===editTier);
+    cell.className="ed-tiercell"+(t.icon===editTier?" sel":"")+(locked?" locked":"");
+    cell.title=(locked?("Locked - reach Tier #"+t.t+" ("+t.name+")"):(t.name+" (#"+t.t+")"));
+    const im=document.createElement("img");
+    im.src=iconPath(t.icon);
+    im.alt="";
+    im.onerror=()=>{im.style.display="none";};
+    const num=document.createElement("span");
+    num.className="ed-tiernum";
+    num.textContent="#"+(t.t);
+    cell.appendChild(im);cell.appendChild(num);
+    cell.onclick=()=>{
+      if(locked)return;
+      editTier=t.icon;
+      pick.querySelectorAll(".ed-tiercell").forEach(x=>x.classList.remove("sel"));
+      cell.classList.add("sel");
+    };
+    pick.appendChild(cell);
+  });
+
+  function collectLinks(){
+    const out=[];
+    const box=document.getElementById("ed-links");
+    if(!box)return out;
+    [...box.querySelectorAll(".ed-linkrow")].forEach(row=>{
+      const sel=row.querySelector(".ed-platform");
+      const inp=row.querySelector(".ed-url");
+      const p=sel?sel.value:"github";
+      const u=inp?inp.value.trim():"";
+      if(u)out.push({platform:p,url:u});
+    });
+    return out;
+  }
+  function wireRow(row){
+    const del=row.querySelector(".ed-del");
+    if(del)del.onclick=()=>row.remove();
+    // Platform selector keeps the row's icon in sync.
+    const sel=row.querySelector(".ed-platform");
+    const icon=row.querySelector(".ed-picon");
+    if(sel)sel.onchange=()=>{ if(icon)icon.src=linkIcon(sel.value); };
+    // Drag-and-drop reordering within the flat link list (any platform).
+    let dragSrc=null;
+    // Make only the drag handle initiate a drag (inputs/buttons stay usable).
+    row.addEventListener("dragstart",e=>{
+      if(!e.target.closest(".ed-drag")){e.preventDefault();return;}
+      dragSrc=row; dragSrc.classList.add("dragging");
+      try{e.dataTransfer.setData("text/plain","");e.dataTransfer.effectAllowed="move";}catch(_){}
+    });
+    row.addEventListener("dragend",()=>{
+      if(dragSrc)dragSrc.classList.remove("dragging");
+      document.querySelectorAll("#edit .ed-linkrow").forEach(r=>r.classList.remove("drag-over"));
+      dragSrc=null;
+    });
+    row.addEventListener("dragover",e=>{
+      e.preventDefault();
+      const box=row.parentElement;
+      if(box&&box.id==="ed-links"&&dragSrc&&dragSrc.parentElement===box)row.classList.add("drag-over");
+    });
+    row.addEventListener("dragleave",()=>row.classList.remove("drag-over"));
+    row.addEventListener("drop",e=>{
+      e.preventDefault();
+      row.classList.remove("drag-over");
+      if(!dragSrc||dragSrc===row||dragSrc.parentElement!==row.parentElement)return;
+      const box=row.parentElement;
+      const rows=[...box.querySelectorAll(".ed-linkrow")];
+      const from=rows.indexOf(dragSrc), to=rows.indexOf(row);
+      if(from<0||to<0)return;
+      box.insertBefore(dragSrc, from<to ? row.nextSibling : row);
+    });
+    // Prevent the drag handle from starting a drag when clicking the input/button
+    const handle=row.querySelector(".ed-drag");
+    if(handle)handle.addEventListener("mousedown",e=>e.stopPropagation());
+  }
+  document.querySelectorAll("#edit .ed-linkrow").forEach(wireRow);
+  document.querySelectorAll("#edit .ed-add").forEach(b=>{
+    b.onclick=()=>{
+      const box=document.getElementById("ed-links");
+      if(!box)return;
+      const first=LINK_PLATFORMS[0].key;
+      box.insertAdjacentHTML("beforeend",linkRowHtml(first,""));
+      wireRow(box.lastElementChild);
+    };
+  });
+
+  // Profile theme color switchers — update editProf + live-preview the popup
+  document.querySelectorAll("#edit [data-proftheme]").forEach(inp=>{
+    inp.oninput=()=>{
+      editProf[inp.dataset.proftheme]=inp.value;
+      if(inp.dataset.proftheme==="color"&&!editProf.border)editProf.border=inp.value;
+      const pp=document.getElementById("prof");
+      if(pp&&pp.classList.contains("open")){applyProfileTheme(pp,editProf);}
+    };
+  });
+  // Pre-built profile theme presets: fill EVERY swatch + preview the popup.
+  const profPreset=document.getElementById("ed-profpreset");
+  if(profPreset)profPreset.onchange=()=>{
+    const preset=PROFILE_PRESETS[parseInt(profPreset.value,10)];
+    if(!preset){return;}
+    // Update every visible profile-theme swatch (not just the keys a preset
+    // happens to carry), so a template always recolours the whole section.
+    PROFILE_THEME_ITEMS.forEach(([k])=>{
+      let v=preset.values[k];
+      if(v==null && k==="border")v=preset.values.color;
+      if(v==null)return;
+      editProf[k]=v;
+      const inp=document.querySelector('#edit [data-proftheme="'+k+'"]');
+      if(inp)inp.value=v;
+    });
+    const pp=document.getElementById("prof");
+    if(pp)applyProfileTheme(pp,editProf);
+    profPreset.value="";
+  };
+  // DEV rainbow border toggle — overrides whichever border color is set.
+  const rb=document.getElementById("ed-rainbow");
+  if(rb)rb.onchange=()=>{
+    editProf.rainbow=rb.checked;
+    const pp=document.getElementById("prof");
+    if(pp&&pp.classList.contains("open")){applyProfileTheme(pp,editProf);}
+  };
+  // Tier unlock notifications toggle
+  const tun=document.getElementById("ed-tierunlock");
+  tun.checked=(localStorage.getItem("pixelOfficeTierUnlockMuted")!=="1");
+  tun.onchange=()=>{
+    if(tun.checked){localStorage.removeItem("pixelOfficeTierUnlockMuted");}
+    else{localStorage.setItem("pixelOfficeTierUnlockMuted","1");}
+  };
+  // "Always use new icon on unlock" toggle
+  const tua=document.getElementById("ed-tierauto");
+  tua.checked=(localStorage.getItem("pixelOfficeTierAutoIcon")==="1");
+  tua.onchange=()=>{
+    if(tua.checked){localStorage.setItem("pixelOfficeTierAutoIcon","1");}
+    else{localStorage.removeItem("pixelOfficeTierAutoIcon");}
+  };
+  document.querySelectorAll("#edit [data-theme]").forEach(inp=>{
+    inp.oninput=()=>{
+      const k=inp.dataset.theme;
+      editIface[k]=(k==="fontSize")?parseInt(inp.value||THEME_DEFAULTS.fontSize):inp.value;
+      applyInterfaceTheme(editIface);
+    };
+  });
+  // Master Theme: one selection applies a theme to EVERY interface category.
+  // The per-category preset arrays are built in lockstep (same index = same
+  // theme), so applying index idx across all categories is consistent.
+  const masterPreset=document.getElementById("ed-masterpreset");
+  if(masterPreset)masterPreset.onchange=()=>{
+    const idx=parseInt(masterPreset.value,10);
+    if(isNaN(idx))return;
+    themeGroups.forEach(([gkey])=>{
+      const preset=(INTERFACE_PRESETS[gkey]||[])[idx];
+      if(!preset)return;
+      const group=themeGroups.find(g=>g[0]===gkey);
+      const keys=(group?group[2]:[]).map(x=>x[0]);
+      keys.forEach(k=>{
+        if(preset.values[k]!=null){
+          editIface[k]=preset.values[k];
+          const inp=document.querySelector('#edit [data-theme="'+k+'"]');
+          if(inp)inp.value=preset.values[k];
+        }
+      });
+      // reflect the chosen theme in each sub-theme dropdown
+      const sel=document.querySelector('#edit .ed-preset[data-preset-cat="'+gkey+'"]');
+      if(sel)sel.value=String(idx);
+    });
+    applyInterfaceTheme(editIface);
+    masterPreset.value="";
+  };
+  // Pre-built theme presets: fill the whole category's color pickers + apply.
+  // Only interface-theme selects carry data-preset-cat; the profile-theme
+  // select (#ed-profpreset) is handled by its own handler above, so skip it
+  // here or it would overwrite that handler.
+  document.querySelectorAll("#edit .ed-preset").forEach(sel=>{
+    if(!sel.dataset.presetCat)return;
+    sel.onchange=()=>{
+      const gkey=sel.dataset.presetCat;
+      const preset=(INTERFACE_PRESETS[gkey]||[])[parseInt(sel.value,10)];
+      if(!preset){return;}
+      // update editIface + the visible color inputs for every key in the preset
+      const group=themeGroups.find(g=>g[0]===gkey);
+      const keys=(group?group[2]:[]).map(x=>x[0]);
+      keys.forEach(k=>{
+        if(preset.values[k]!=null){
+          editIface[k]=preset.values[k];
+          const inp=document.querySelector('#edit [data-theme="'+k+'"]');
+          if(inp)inp.value=preset.values[k];
+        }
+      });
+      applyInterfaceTheme(editIface);
+      sel.value="";
+    };
+  });
+
+  const status=document.getElementById("ed-status");
+  document.getElementById("ed-save").onclick=()=>{
+    editBio=document.getElementById("ed-bio").value;
+    const links=collectLinks();
+    const payload={bio:editBio,links:links,tierIcon:editTier,profileTheme:editProf,interfaceTheme:editIface};
+    // Save locally first so edits apply immediately, even before the server
+    // is restarted (server /profile may 404 until then).
+    const prof=loadLocalProfile()||{};
+    prof.bio=editBio; prof.links=links; prof.tierIcon=editTier;
+    prof.profileTheme=editProf; prof.interfaceTheme=editIface;
+    saveLocalProfile(prof);
+    try{localStorage.setItem("pixelOfficeTheme",JSON.stringify(editIface));}catch(e){}
+    status.style.color="var(--green)";
+    status.style.display="block";status.textContent="Saved ✓";
+    setTimeout(()=>{status.style.display="none";},2200);
+    pushMyProfile();
+    // best-effort server sync (persists server-side after a Hermes restart)
+    fetch("profile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+      .catch(()=>{});
+    editPanelOpen=false;
+    pollNow();
+  };
+  const logoutBtn=document.getElementById("ed-logout");
+  if(logoutBtn)logoutBtn.onclick=()=>{
+    try{localStorage.removeItem(localProfileKey());}catch(e){}
+    try{localStorage.removeItem("pixelOfficeTheme");}catch(e){}
+    applyInterfaceTheme(null);
+    editPanelOpen=false;
+    togglePanel("edit",false);
+    fetch("identify",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({github:""})})
+      .then(()=>pollNow()).catch(()=>pollNow());
+  };
+  el.querySelector(".pclose").onclick=()=>{
+    // Cancel: revert live interface-theme + profile-theme previews to the
+    // state that was applied when the panel opened (only Save persists).
+    editPanelOpen=false;
+    if(baseIface)applyInterfaceTheme(baseIface);
+    const pp=document.getElementById("prof");
+    if(pp){["--border","--accent","--panel","--panel2","--text","--sub",
+      "--link","--green","--dev"].forEach(v=>pp.style.removeProperty(v));}
+    togglePanel("edit",false);
+  };
+  togglePanel("edit",true);
+}
+
+// ── tier ladder ────────────────────────────────────────────────────────
+function tierForOps(ops, calls, sessions){
+  const list=(window.OFFICE_TIERS && window.OFFICE_TIERS.length)
+    ? window.OFFICE_TIERS
+    : (state && state.tiers ? state.tiers : []);
+  let cur=list[0]||null;
+  for(const t of list){
+    if((t.ops||0)<=ops
+       && (t.calls||0)<=(calls||0)
+       && (t.sessions||0)<=(sessions||0)) cur=t; else break;
+  }
+  return cur;
+}
+function myTierName(){
+  if(!state||!state.identity)return null;
+  const board=mergeBoards(currentBoard(),loadCachedBoard());
+  const my=board.find(isMine);
+  return my ? (tierForOps(my.ops,my.tools,my.sessions) || my.tier) : null;
+}
+// _tiersSig guards against rebuilding all 500 icon rows on every poll tick /
+// P2P packet. The ladder content only changes when the viewer's rung moves
+// (myIdx), so skip the DOM rebuild when it hasn't — stops the icons flickering.
+let _tiersSig=null;
+function renderTiers(){
+  const el=document.getElementById("tier-list");
+  // Prefer the static full ladder shipped in tiers.js (all 500 icons) so the
+  // ladder updates instantly; fall back to whatever the server exposed.
+  const tiers=(window.OFFICE_TIERS && window.OFFICE_TIERS.length)
+    ? window.OFFICE_TIERS
+    : (state && state.tiers ? state.tiers : []);
+  if(!tiers.length){el.innerHTML='<div class="pempty">tiers unavailable</div>';_tiersSig=null;return;}
+  const myTier=myTierName();
+  const myIdx=myTier?myTier.t-1:-1;
+  const sig=tiers.length+":"+myIdx+(tiers[0]?tiers[0].t:"");
+  if(sig===_tiersSig)return;
+  _tiersSig=sig;
+  el.innerHTML=tiers.map((t,i)=>{
+    const reached=myTier?i<=myIdx:false;
+    const current=i===myIdx;
+    const cls=(reached?"me":"locked")+(current?" current":"");
+    return '<div class="tier-row '+cls+'">'+
+      '<span class="tier-rank">#'+t.t+'</span>'+
+      '<img class="tier-ic" src="'+iconPath(t.icon)+'" alt="" onerror="this.style.visibility=\'hidden\'">'+
+      '<span class="tier-nm">'+esc(t.name)+'</span>'+
+      '<span class="tier-ops"><b>'+fmtNum(t.ops)+'</b> Ops'+(current?' · you':"")+'</span>'+
+      '</div>';
+  }).join("");
+  // on-hover tier tooltip (top-right): large icon + requirements
+  const tip=document.getElementById("tooltip");
+  [...el.children].forEach((row,i)=>{
+    const t=tiers[i];
+    row.onmouseenter=()=>{
+      tip.innerHTML='<div class="tt-top"><img src="'+iconPathLarge(t.icon)+'" alt="" onerror="this.onerror=null;this.src=\''+iconPath(t.icon)+'\';if(!this.complete){this.style.display=\'none\';}">'+
+        '<div><div class="tt-name">'+esc(t.name)+'</div><div class="tt-num">Tier #'+t.t+'</div></div></div>'+
+        '<div class="tt-req">Requires <b style="color:var(--accent)">'+fmtNum(t.ops)+'</b> Ops</div>'+
+        '<div class="tt-req">'+fmtNum(t.calls||tierCalls(t.ops))+' calls · '+fmtNum(t.sessions||tierSessions(t.ops))+' sessions</div>'+
+        '<div class="tt-mat">'+esc(t.material||"")+'</div>';
+      tip.style.display="block";
+    };
+    row.onmouseleave=()=>{tip.style.display="none";};
+  });
+}
+
+// ── chat (via P2P mesh) ───────────────────────────────────────────────
+const LS_CHAT = "pixelOfficeChat";
+let chatSoundOn=false;
+try{chatSoundOn=localStorage.getItem("pixelOfficeChatSound")==="1"}catch(e){}
+function chatChime(){ // gentle two-note chat "ding" (distinct from approval chime)
+  if(!chatSoundOn)return;
+  try{
+    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+    // Browsers suspend AudioContext until a gesture/resume; without this the
+    // first incoming-chat chime is silent. Resume (async, fire-and-forget).
+    if(audioCtx.state==="suspended"){try{audioCtx.resume();}catch(e){}}
+    [880,1320].forEach((f,i)=>{
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.type="sine";o.frequency.value=f;
+      g.gain.setValueAtTime(0.05,audioCtx.currentTime+i*0.09);
+      g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+i*0.09+0.09);
+      o.connect(g);g.connect(audioCtx.destination);
+      o.start(audioCtx.currentTime+i*0.09);o.stop(audioCtx.currentTime+i*0.09+0.1);
+    });
+  }catch(e){}
+}
+function syncChatSoundBtn(){
+  const b=document.getElementById("chat-sound");
+  b.textContent=chatSoundOn?"♪ sound on":"♪ sound off";
+  b.classList.toggle("on",chatSoundOn);
+}
+document.getElementById("chat-sound").onclick=()=>{
+  chatSoundOn=!chatSoundOn;
+  try{localStorage.setItem("pixelOfficeChatSound",chatSoundOn?"1":"0")}catch(e){}
+  if(chatSoundOn)chatChime(); syncChatSoundBtn();
+};
+syncChatSoundBtn();
+function loadCachedChat(){ try{return JSON.parse(localStorage.getItem(LS_CHAT)||"[]")}catch(e){return []} }
+function saveCachedChat(msgs){ try{localStorage.setItem(LS_CHAT,JSON.stringify(msgs.slice(-200)))}catch(e){} }
+function chatMsgHtml(m){
+  const gh=isDev(m.github);
+  const ts=m.ts||m.t||Date.now();
+  const tIcon=m.tierIcon||(m.tier&&m.tier.icon)||"";
+  const tierNo=(m.tier&&m.tier.t)||"";
+  const tier=(tIcon)
+    ? '<span class="ctierl"><img src="'+iconPath(tIcon)+'" alt="" onerror="this.style.display=\'none\'"><b>#'+esc(tierNo)+'</b></span>'
+    : '';
+  // DEV rainbow: if this sender has rainbow enabled in their profile theme,
+  // render their chat name with the animated rainbow gradient.
+  let rainbow=false;
+  if(gh&&m.github){
+    const g=String(m.github).toLowerCase();
+    const board=mergeBoards(currentBoard(),loadCachedBoard());
+    const row=board.find(r=>r.github&&String(r.github).toLowerCase()===g);
+    if(row&&row.profileTheme&&row.profileTheme.rainbow)rainbow=true;
+  }
+  return '<div class="cmsg"'+(m.github?' data-github="'+esc(m.github)+'" title="open profile"':'')+'>'+
+    tier+
+    (m.avatar?'<img class="cav" src="'+esc(m.avatar)+'" alt="">':'<div class="cav gh"></div>')+
+    '<div class="cbody"><div class="cuser">'+
+    (m.url?'<a href="'+esc(m.url)+'" target="_blank" rel="noopener">':"")+
+    '<span'+(rainbow?' class="rainbow-name"':' style="color:'+(gh?"#ffd700":"#e8c170")+'"')+'>'+esc(m.user||"guest")+'</span>'+
+    (gh?' <span style="font-size:8px;color:#ffd700;border:1px solid #ffd70066;border-radius:2px;padding:0 3px">DEV</span>':'')+
+    (m.url?'</a>':"")+
+    ' <span class="ctime">'+timeStr(ts/1000)+'</span></div>'+
+    '<div class="ctext">'+esc(m.text)+'</div></div></div>';
+}
+function renderChat(){
+  const el=document.getElementById("chat-list");
+  let msgs=(window.PixelOfficeP2P?PixelOfficeP2P.getChat():[]);
+  // merge the cached history so chat survives nobody being online
+  const byKey=new Map();
+  const chatKey=m=>m.id||(m.user+"|"+m.text+"|"+(m.ts||""));
+  loadCachedChat().forEach(m=>byKey.set(chatKey(m),m));
+  msgs.forEach(m=>byKey.set(chatKey(m),m));
+  msgs=[...byKey.values()].sort((a,b)=>(a.ts||0)-(b.ts||0));
+  saveCachedChat(msgs);
+  if(!msgs.length){el.innerHTML='<div class="pempty">no messages yet — say something to the office</div>';return;}
+  // Attach each sender's tier (icon + number) — from the message if present,
+  // else look it up from the merged leaderboard so cached/older messages still
+  // show the right tier badge.
+  const board=mergeBoards(currentBoard(),loadCachedBoard());
+  const rowBy=new Map();
+  board.forEach(r=>{
+    if(r.github)rowBy.set(String(r.github).toLowerCase(), r);
+    rowBy.set(String(r.name).toLowerCase(), r);
+  });
+  msgs.forEach(m=>{
+    if(!m.tier||!m.tierIcon){
+      const k=String(m.github||m.user||"").toLowerCase();
+      const row=rowBy.get(k);
+      if(row){
+        if(!m.tier)m.tier=row.tier||tierForOps(row.ops,row.tools,row.sessions);
+        if(!m.tierIcon)m.tierIcon=rowTierIcon(row);
+      }
+    }
+  });
+  el.innerHTML=msgs.map(chatMsgHtml).join("");
+  el.querySelectorAll(".cmsg[data-github]").forEach(r=>{
+    r.style.cursor="pointer";
+    r.onclick=()=>{const g=r.getAttribute("data-github");if(g)showProfile(g);};
+  });
+  el.scrollTop=el.scrollHeight;
+}
+function sendChat(){
+  const input=document.getElementById("chat-input");
+  const text=input.value.trim();
+  if(!text)return;
+  input.value="";
+  if(window.PixelOfficeP2P) PixelOfficeP2P.sendChat(text);
+  renderChat();
+}
+document.getElementById("chat-send").onclick=sendChat;
+document.getElementById("chat-input").addEventListener("keydown",e=>{if(e.key==="Enter")sendChat()});
+
+// ── GitHub connect ─────────────────────────────────────────────────────
+function renderIdentity(){
+  const id=state&&state.identity;
+  const chip=document.getElementById("gh-chip");
+  if(id&&id.github){
+    chip.innerHTML=(id.avatar?'<img src="'+esc(id.avatar)+'" alt="">':'⚙ ')+esc(id.name||id.github);
+    chip.classList.toggle("dev",isDev(id.github));
+  }else{
+    chip.innerHTML="⚙ connect";chip.classList.remove("dev");
+  }
+  const st=document.getElementById("gh-status");
+  if(id&&id.github){
+    st.className="";st.innerHTML='<div class="gh-u">'+(id.avatar?'<img src="'+esc(id.avatar)+'" alt="">':"")+
+      '<span>connected as <b style="color:#e8c170">'+esc(id.name||id.github)+
+      '</b>'+ (isDev(id.github)?' <span style="color:#ffd700;border:1px solid #ffd70066;border-radius:2px;padding:0 3px">DEV</span>':"")+
+      (id.url?' — <a href="'+esc(id.url)+'" target="_blank" rel="noopener" style="color:#7fa8d8">profile ↗</a>':"")+
+      '</span></div>';
+  }else{
+    st.className="";st.textContent="not connected — agents show as their session label.";
+  }
+  const loginBtn=document.getElementById("gh-login");
+  if(loginBtn)loginBtn.textContent=(id&&id.github)?"✓ Logged in with GitHub":"⇪ Log in with GitHub";
+}
+document.getElementById("gh-clear").onclick=()=>{
+  fetch("identify",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({github:""})})
+    .then(()=>pollNow()).catch(()=>{});
+};
+document.getElementById("gh-login").onclick=()=>{
+  const st=document.getElementById("gh-status");
+  st.className="";st.textContent="logging in…";
+  fetch("auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})
+    .then(r=>r.json()).then(d=>{
+      if(d.logged_in){
+        pollNow();
+      }else{
+        st.className="err";
+        st.textContent="no GitHub login available on this machine — run `gh auth login`.";
+      }
+    })
+    .catch(()=>{st.className="err";st.textContent="login failed";});
+};
+
+// ── P2P mesh wiring ─────────────────────────────────────────────────────
+let p2pStarted=false, lastIdGit="";
+// Fetch the Cloudflare relay URL (set via config or PIXEL_OFFICE_RELAY env)
+// so multiplayer works even when the WebRTC mesh can't open under CGNAT.
+fetch("office-config").then(function(r){return r.json();}).then(function(cfg){
+  if(cfg && cfg.relay_url) window.OFFICE_RELAY=cfg.relay_url;
+}).catch(function(){});
+if(window.PixelOfficeP2P){
+  PixelOfficeP2P.onChat(m=>{
+    if(m && m.user && !(m.github && state && state.identity &&
+       state.identity.github===m.github)) chatChime(); // ding on others' messages
+    renderChat();
+  });
+  PixelOfficeP2P.onScore(()=>{
+    renderLeaderboard(); renderModelBoard(); renderTiers();
+    saveCachedBoard(mergeBoards(currentBoard(),loadCachedBoard()));
+  });
+}
+function syncP2P(){
+  if(!window.PixelOfficeP2P) return;
+  const id=(state&&state.identity)||null;
+  const git=id&&id.github?id.github:"";
+  if(git && !p2pStarted){
+    PixelOfficeP2P.start(id, { relay: window.OFFICE_RELAY || "" });
+    p2pStarted=true;
+  }else if(!git && p2pStarted){
+    PixelOfficeP2P.stop();
+    p2pStarted=false;
+  }
+  if(p2pStarted){
+    PixelOfficeP2P.broadcastScore(localRow());
+  }
+}
 
 // ── render loop ─────────────────────────────────────────────────────────
 function render(){
   frame++;
   const W=cv.clientWidth,H=cv.clientHeight;
   if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
-  // auto-shrink pixels if the office is crowded
   const rowsAt=s=>Math.ceil(agents.length/Math.max(1,Math.floor((W/s-8)/34)));
   S=4; while(S>2 && 14+rowsAt(S)*32*S>H-8*S && agents.length) S--;
   const gw=Math.floor(W/S),gh=Math.floor(H/S);
@@ -241,7 +2158,6 @@ function render(){
     if(seated){const seat=seatPos(i,perRow);
       drawBubble(a,seat.x+2,seat.y); label(a,seat.x,seat.y);}
   });
-  // walking-out ghosts
   for(const [id,c] of chars){
     if(c.phase==="out"&&!agents.find(a=>a.id===id))
       drawChar({id,kind:"main",status:"gone",activity:""},c.x,c.y,false);
@@ -259,27 +2175,70 @@ function render(){
   requestAnimationFrame(render);
 }
 
-// ── data feed: postMessage (VS Code) or poll /state (browser) ───────────
-function applyState(state){
-  offline=null; agents=(state&&state.agents)||[];
+// ── data feed ───────────────────────────────────────────────────────────
+function applyState(st){
+  offline=null; agents=(st&&st.agents)||[]; state=st;
   const n=agents.length, w=agents.filter(a=>a.status==="waiting").length;
   document.getElementById("count").textContent=
-    n+" agent"+(n===1?"":"s")+(w?" · "+w+" waiting!":"");
+    n+" agent"+(n===1?"": "s")+(w?" · "+w+" waiting!":"");
+  // stats strip — to the LEFT of the count
+  const gs=(st&&st.stats)||{};
+  document.getElementById("st-ops").textContent=fmtNum(gs.ops||0);
+  document.getElementById("st-tools").textContent=fmtNum(gs.tools||0);
+  document.getElementById("st-sess").textContent=fmtNum(gs.sessions||0);
+  document.getElementById("st-time").textContent=fmtTime(gs.time_ms?gs.time_ms/1000:0);
+  // Attach live agent status (from the office scene) to every row's roster so
+  // profile AGENTS lists show real-time state even before the server restarts.
+  if(st.agents&&st.agents.length){
+    const sceneMap={};
+    st.agents.forEach(a=>sceneMap[a.id]=a);
+    (st.leaderboard||[]).forEach(r=>{
+      (r.agents||[]).forEach(ag=>{
+        const sa=sceneMap[ag.id];
+        if(sa){ag.status=sa.status||"";ag.tool=sa.tool||"";ag.activity=sa.activity||"";ag.detail=sa.detail||"";}
+      });
+    });
+  }
+  // Overlay the locally-saved profile (works before the server is restarted).
+  applyLocalProfile();
+  // Apply the local viewer's interface theme from their own leaderboard row.
+  // If the server row carries no theme yet (e.g. server not restarted), keep
+  // whatever is currently applied (default or the locally-saved theme).
+  let myRow=null;
+  if(state&&state.identity&&state.identity.github){
+    myRow=(st.leaderboard||[]).find(r=>r.github&&
+      String(r.github).toLowerCase()===String(state.identity.github).toLowerCase());
+  }
+  if(myRow && myRow.interfaceTheme && Object.keys(myRow.interfaceTheme).length && !editPanelOpen){
+    applyInterfaceTheme(myRow.interfaceTheme);
+  }
+  syncP2P();
+  renderIdentity();
+  renderLeaderboard();
+  renderModelBoard();
+  renderTiers();
+  renderChat();
+  saveCachedBoard(mergeBoards(currentBoard(),loadCachedBoard()));
+  checkTierUnlock();
+}
+// Global refresh — pull /state + re-render (used by profile save/logout/icon pickers).
+let polling=false;
+async function pollNow(){
+  if(polling)return; polling=true;
+  try{const r=await fetch("state");applyState(await r.json());}
+  catch(e){offline=String(location.host);agents=[];state=null;
+    document.getElementById("count").textContent="offline";}
+  polling=false;
 }
 if(IN_VSCODE){
   window.addEventListener("message",(ev)=>{
     const m=ev.data||{};
     if(m.type==="state")applyState(m.state);
-    else if(m.type==="offline"){offline=m.url;agents=[];
+    else if(m.type==="offline"){offline=m.url;agents=[];state=null;
       document.getElementById("count").textContent="offline";}
   });
 }else{
-  (async function poll(){
-    try{const r=await fetch("state");applyState(await r.json());}
-    catch(e){offline=String(location.host);agents=[];
-      document.getElementById("count").textContent="offline";}
-    setTimeout(poll,1500);
-  })();
+  (function loop(){pollNow();setTimeout(loop,1500);})();
 }
 render();
 </script>

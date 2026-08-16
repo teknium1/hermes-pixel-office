@@ -45,6 +45,16 @@ GOALS = ["Review PR #81212", "Research competitor docs", "Fix flaky gateway test
 
 mod._on_session_start(session_id="sess-main-cli", platform="cli")
 mod._on_session_start(session_id="sess-tg-main", platform="telegram")
+# Connect a GitHub identity + post a chat line so the leaderboard / chat / tiers
+# panels have content to show.
+try:
+    mod.set_identity(os.environ.get("PIXEL_OFFICE_GH", "DrGekoz"))
+except Exception:
+    pass
+try:
+    mod.post_chat("demo feed online — agents are working the floor")
+except Exception:
+    pass
 print("pixel-office demo feed running — open http://127.0.0.1:%d" % mod._resolve_port())
 
 live_subs, n = [], 0

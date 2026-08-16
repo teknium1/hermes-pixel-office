@@ -1,0 +1,19 @@
+name = "pixel-office-relay"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# Free tier: 100k requests/day, serverless, runs non-stop, no VPS.
+
+[durable_objects]
+bindings = [{ name = "OFFICE", class_name = "OfficeDO" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OfficeDO"]
+
+# Optional durable gist backup (host-appointed, one write / 10 min).
+# Set via:  npx wrangler secret put GITHUB_TOKEN
+#           npx wrangler secret put GITHUB_GIST_ID
+# If unset, the Durable Object storage is still the durable store.
+# [vars]
+# GITHUB_GIST_ID = ""
