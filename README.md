@@ -64,10 +64,17 @@ plugins:
   entries:
     pixel-office:
       port: 8113        # change if something else owns 8113
+      host: 127.0.0.1   # bind address; set 0.0.0.0 to expose beyond localhost
 ```
 
 If you change the port, point the extension setting
 `hermesPixelOffice.stateUrl` at the same port.
+
+The server binds to `127.0.0.1` by default, so it is only reachable from the
+machine Hermes runs on (e.g. behind an SSH tunnel). To make it reachable from
+other machines on your network — or from a container/VM port-forward that
+connects to a non-loopback address — set `host: 0.0.0.0` (all interfaces) or a
+specific interface address.
 
 ## Try it without any agents
 
