@@ -28,6 +28,7 @@ Configuration (all optional, config.yaml):
       entries:
         pixel-office:
           port: 8113        # HTTP port for the office page
+          host: 127.0.0.1   # bind address; set 0.0.0.0 to expose beyond localhost
           enabled: true
 
 Nothing here touches the conversation, the prompt cache, or tool results.
@@ -256,16 +257,40 @@ def build_state() -> Dict[str, Any]:
 # HTTP server
 # ---------------------------------------------------------------------------
 
-def _resolve_port() -> int:
+def _plugin_cfg() -> Any:
     try:
         from hermes_cli.config import cfg_get, load_config
 
-        p = cfg_get(load_config(), "plugins", "entries", "pixel-office", "port")
-        if p:
-            return int(p)
+        return cfg_get(load_config(), "plugins", "entries", "pixel-office")
     except Exception:
-        pass
+        return None
+
+
+def _cfg_value(key: str) -> Optional[str]:
+    cfg = _plugin_cfg()
+    if not isinstance(cfg, dict):
+        return None
+    value = cfg.get(key)
+    return str(value).strip() if value else None
+
+
+def _resolve_port() -> int:
+    p = _cfg_value("port")
+    if p:
+        try:
+            return int(p)
+        except ValueError:
+            pass
     return DEFAULT_PORT
+
+
+DEFAULT_HOST = "127.0.0.1"
+
+
+def _resolve_host() -> str:
+    # e.g. "host: 0.0.0.0" to expose the office beyond localhost.
+    host = _cfg_value("host")
+    return host or DEFAULT_HOST
 
 
 def _ensure_server() -> None:
@@ -285,6 +310,7 @@ def _serve() -> None:
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
     _port = _resolve_port()
+    host = _resolve_host()
     html_path = Path(__file__).resolve().parent / "web" / "index.html"
 
     class Handler(BaseHTTPRequestHandler):
@@ -313,7 +339,7 @@ def _serve() -> None:
                 logger.debug("pixel-office request failed", exc_info=True)
 
     try:
-        srv = ThreadingHTTPServer(("127.0.0.1", _port), Handler)
+        srv = ThreadingHTTPServer((host, _port), Handler)
     except OSError as exc:
         # Port already bound. Probe it: a healthy pixel-office answers /state
         # with JSON containing "agents". Anything else is a foreign squatter
@@ -328,16 +354,16 @@ def _serve() -> None:
             )
         else:
             logger.warning(
-                "pixel-office: could NOT bind 127.0.0.1:%s (%s) and the "
+                "pixel-office: could NOT bind %s:%s (%s) and the "
                 "current listener does not answer like a pixel-office "
                 "(probe: %s). Another app or a stale VS Code port-forward is "
                 "squatting the port. Fix: free the port, or set "
-                "plugins.entries.pixel-office.port in config.yaml and update "
-                "the extension's hermesPixelOffice.stateUrl to match.",
-                _port, exc, verdict,
+                "plugins.entries.pixel-office.port/host in config.yaml.",
+                host, _port, exc, verdict,
             )
         return
-    logger.info("pixel-office serving at http://127.0.0.1:%s", _port)
+    display_host = "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
+    logger.info("pixel-office serving at http://%s:%s", display_host, _port)
     try:
         srv.serve_forever()
     except Exception:
@@ -467,6 +493,6 @@ def register(ctx: Any) -> None:
     ctx.register_hook("pre_approval_request", _pre_approval_request)
     ctx.register_hook("post_approval_response", _post_approval_response)
     logger.info(
-        "pixel-office registered — office at http://127.0.0.1:%s once events flow",
-        _resolve_port(),
+        "pixel-office registered — office at http://%s:%s once events flow",
+        _resolve_host(), _resolve_port(),
     )
