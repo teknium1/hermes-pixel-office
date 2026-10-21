@@ -22,6 +22,11 @@ Design:
 * The event log is trimmed when it exceeds ~512 KB (keeps the newest half),
   so it never grows unbounded.
 
+* Kanban: an agent running a Hermes Kanban task carries ``kanban``
+  ({id, title, status}) in ``/state``, and ``GET /kanban`` serves the wall
+  board (open, blocked and recently done tasks of ``~/.hermes/kanban.db``,
+  read-only, re-read at most every 3 s).
+
 Configuration (all optional, config.yaml):
 
     plugins:
@@ -42,7 +47,7 @@ import socket
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from hermes_constants import get_hermes_home
 
@@ -147,6 +152,79 @@ def _short(text: Any, n: int = 60) -> str:
     return s[: n - 1] + "…" if len(s) > n else s
 
 
+# ---------------------------------------------------------------------------
+# Kanban (read-only): which session works on which task, and the wall board
+# ---------------------------------------------------------------------------
+
+_KANBAN_TTL = 3.0
+_KANBAN_DONE_SHOWN = 24 * 3600          # done tasks stay on the board for a day
+_KANBAN_MAX = 14
+# board column per task status; "todo" gathers everything not yet picked up
+_KANBAN_COLUMN = {"running": "running", "blocked": "blocked", "review": "review",
+                  "ready": "todo", "todo": "todo", "triage": "todo", "scheduled": "todo",
+                  "done": "done"}
+_KANBAN_ORDER = {"running": 0, "blocked": 1, "review": 2, "todo": 3, "done": 4}
+_kanban_cache: Tuple[float, Dict[str, Any]] = (0.0, {"sessions": {}, "tasks": []})
+
+
+def _kanban_db() -> Path:
+    """The default board lives in the main Hermes home, also when this process runs a profile."""
+    home = Path(get_hermes_home())
+    root = home.parent.parent if home.parent.name == "profiles" else home
+    return root / "kanban.db"
+
+
+def _kanban_snapshot() -> Dict[str, Any]:
+    """{"sessions": {session_id: task}, "tasks": [...]} for the default board, re-read at most
+    every 3 s. Read-only; a missing or busy database just shows nothing."""
+    global _kanban_cache
+    now = time.time()
+    if now - _kanban_cache[0] < _KANBAN_TTL:
+        return _kanban_cache[1]
+    snap: Dict[str, Any] = {"sessions": {}, "tasks": [], "total": 0}
+    path = _kanban_db()
+    if path.exists():
+        try:
+            import sqlite3
+
+            con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=1)
+            try:
+                tasks: Dict[str, Dict[str, Any]] = {}
+                for tid, title, assignee, status, created, started, completed, sid in con.execute(
+                        "SELECT id, title, assignee, status, created_at, started_at, completed_at, session_id "
+                        "FROM tasks WHERE status != 'archived'"):
+                    column = _KANBAN_COLUMN.get(str(status or ""))
+                    if not column:
+                        continue
+                    t = {"id": tid, "title": _short(title, 48), "status": column,
+                         "assignee": str(assignee or ""),
+                         "updated": float(completed or started or created or 0)}
+                    tasks[tid] = t
+                    if sid:
+                        snap["sessions"][str(sid)] = t
+                # every attempt's session, retries included (tasks.session_id holds one at most)
+                for tid, payload in con.execute(
+                        "SELECT task_id, payload FROM task_events WHERE kind = 'owner_admitted' "
+                        "AND created_at > ?", (now - _KANBAN_DONE_SHOWN,)):
+                    try:
+                        sid = json.loads(payload or "{}").get("session_id")
+                    except ValueError:
+                        continue
+                    if sid and tid in tasks:
+                        snap["sessions"][str(sid)] = tasks[tid]
+            finally:
+                con.close()
+            board = [t for t in tasks.values()
+                     if t["status"] != "done" or now - t["updated"] < _KANBAN_DONE_SHOWN]
+            board.sort(key=lambda t: (_KANBAN_ORDER[t["status"]], -t["updated"]))
+            snap["tasks"] = board[:_KANBAN_MAX]
+            snap["total"] = len(board)
+        except Exception:
+            logger.debug("pixel-office: kanban read failed", exc_info=True)
+    _kanban_cache = (now, snap)
+    return snap
+
+
 def build_state() -> Dict[str, Any]:
     """Fold the event log into {agents: [...]} for the frontend."""
     agents: Dict[str, Dict[str, Any]] = {}
@@ -248,6 +326,13 @@ def build_state() -> Dict[str, Any]:
             a["status"] = "idle"
         visible.append(a)
 
+    # Kanban workers: the task they are on (a subagent shows its parent's task).
+    on_task = _kanban_snapshot()["sessions"]
+    for a in visible:
+        t = on_task.get(a["id"]) or (on_task.get(a.get("parent") or "") if a["kind"] == "subagent" else None)
+        if t:
+            a["kanban"] = {"id": t["id"], "title": t["title"], "status": t["status"]}
+
     visible.sort(key=lambda a: (a["kind"] != "main", a.get("first_seen", 0)))
     return {"agents": visible, "ts": now}
 
@@ -299,6 +384,13 @@ def _serve() -> None:
                     self.send_header("Content-Type", "text/html; charset=utf-8")
                 elif self.path.split("?")[0] == "/state":
                     body = json.dumps(build_state()).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Cache-Control", "no-store")
+                elif self.path.split("?")[0] == "/kanban":
+                    k = _kanban_snapshot()
+                    body = json.dumps({"tasks": k["tasks"], "total": k.get("total", 0),
+                                       "ts": time.time()}).encode("utf-8")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Cache-Control", "no-store")

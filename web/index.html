@@ -17,6 +17,21 @@
   #hdr .btn:hover{border-color:#e8c170;color:#e8c170}
   #hdr .btn.on{color:#5fce7a;border-color:#5fce7a}
   canvas{flex:1;image-rendering:pixelated;width:100%;height:100%}
+  /* kanban wall board */
+  #wrap{position:relative}
+  #board{position:absolute;top:46px;right:12px;width:min(270px,44vw);
+    max-height:calc(100% - 64px);overflow:auto;box-sizing:border-box;
+    background:#efe6cf;color:#2a2233;border:4px solid #6b4a2b;border-radius:3px;
+    box-shadow:0 0 0 2px #3a2a1a,4px 4px 0 rgba(0,0,0,.35);
+    padding:6px 8px 8px;font-size:12px;line-height:1.35}
+  #board .bt{font-weight:bold;letter-spacing:1px;color:#6b4a2b;
+    border-bottom:2px dashed #c9b88f;padding-bottom:3px;margin-bottom:2px}
+  #board .bh{font-weight:bold;font-size:11px;margin:6px 0 2px;letter-spacing:.5px}
+  #board .bi{display:flex;justify-content:space-between;gap:6px;
+    padding:1px 0 1px 7px;border-left:3px solid #c9b88f}
+  #board .bi span{overflow-wrap:anywhere}
+  #board .bi em{font-style:normal;color:#7a6a55;white-space:nowrap}
+  #board .bi.done span{text-decoration:line-through;color:#7a6f6a}
 </style>
 </head>
 <body>
@@ -25,10 +40,12 @@
     <span>☤ HERMES PIXEL OFFICE</span>
     <span style="flex:1"></span>
     <span class="dim" id="count">connecting…</span>
+    <span class="btn" id="kbtn" title="show or hide the Kanban board">📋 kanban</span>
     <span class="btn" id="sound" title="chime when an agent needs approval or a subagent finishes">♪ sound off</span>
     <span class="btn" id="spawn" style="display:none" title="open a terminal running hermes">+ agent</span>
   </div>
   <canvas id="c"></canvas>
+  <div id="board" hidden></div>
 </div>
 <script>
 "use strict";
@@ -138,6 +155,14 @@ function drawBubble(a,x,y){
   }else if(a.status==="idle"&&(t%8)<4){
     px(x+6,y-4,1,1,"#7a6f8f");px(x+7,y-5,1,1,"#7a6f8f");
   }
+  if(a.kanban) drawClipboard(x+9,y-6);
+}
+// a Kanban worker holds a clipboard, right of its status bubble
+function drawClipboard(x,y){
+  px(x,y+1,4,5,"#6b4a2b");                      // board
+  px(x+1,y+2,2,3,"#efe6cf");                    // paper
+  px(x+1,y,2,1,"#b9b9c6");                      // clip
+  px(x+1,y+3,2,1,"#8a7f6a");                    // a line of text
 }
 function label(a,x,y){
   ctx.font="10px ui-monospace,monospace";ctx.textAlign="center";
@@ -148,7 +173,10 @@ function label(a,x,y){
   ctx.fillStyle={working:"#5fce7a",thinking:"#c9a227",idle:"#7a6f8f",
                  waiting:"#d84f6f",done:"#5fce7a",gone:"#555"}[a.status]||"#7a6f8f";
   ctx.fillText(st.slice(0,17),(x+8)*S,(y+21.5)*S);
-  if(a.detail){ctx.fillStyle="#6a5f80";
+  // a Kanban worker shows its task in place of the tool detail
+  if(a.kanban){ctx.fillStyle="#e8c170";
+    ctx.fillText(("📋 "+a.kanban.title).slice(0,19),(x+8)*S,(y+24.5)*S)}
+  else if(a.detail){ctx.fillStyle="#6a5f80";
     ctx.fillText(a.detail.slice(0,19),(x+8)*S,(y+24.5)*S)}
 }
 
@@ -212,6 +240,44 @@ sBtn.onclick=()=>{soundOn=!soundOn;
   try{localStorage.setItem("pixelOfficeSound",soundOn?"1":"0")}catch(e){}
   if(soundOn)chime([660]); syncSoundBtn()};
 syncSoundBtn();
+
+// ── Kanban wall board (browser only: GET kanban) ────────────────────────
+const board=document.getElementById("board"), kBtn=document.getElementById("kbtn");
+const KCOL={running:["RUNNING","#2f8a4a"], blocked:["BLOCKED","#c9302f"],
+            review:["IN REVIEW","#b07a12"], todo:["TO DO","#5a4a7a"],
+            done:["DONE (24 H)","#6b6280"]};
+let boardOn=true, boardTasks=[], boardTotal=0;
+try{boardOn=localStorage.getItem("pixelOfficeBoard")!=="0"}catch(e){}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,
+  c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c])}
+function drawBoard(){
+  const open=boardTasks.filter(t=>t.status!=="done").length;
+  kBtn.textContent="📋 kanban"+(open?" · "+open:"");
+  kBtn.classList.toggle("on",boardOn);
+  board.hidden=!boardOn||!boardTasks.length;
+  if(board.hidden)return;
+  let html='<div class="bt">📋 KANBAN</div>';
+  for(const k of Object.keys(KCOL)){
+    const ts=boardTasks.filter(t=>t.status===k); if(!ts.length)continue;
+    html+='<div class="bh" style="color:'+KCOL[k][1]+'">'+KCOL[k][0]+' · '+ts.length+'</div>';
+    ts.forEach(t=>{html+='<div class="bi'+(k==="done"?" done":"")+'"><span>'+esc(t.title)+
+      '</span><em>'+esc(t.assignee)+'</em></div>'});
+  }
+  if(boardTotal>boardTasks.length) html+='<div class="bh" style="color:#7a6a55">+ '+
+    (boardTotal-boardTasks.length)+' more</div>';
+  board.innerHTML=html;
+}
+kBtn.onclick=()=>{boardOn=!boardOn;
+  try{localStorage.setItem("pixelOfficeBoard",boardOn?"1":"0")}catch(e){}
+  drawBoard()};
+if(IN_VSCODE) kBtn.style.display="none";
+else (async function pollBoard(){
+  try{const r=await fetch("kanban");
+    if(r.ok){const k=await r.json();boardTasks=k.tasks||[];boardTotal=k.total||0;}}
+  catch(e){boardTasks=[];}
+  drawBoard();
+  setTimeout(pollBoard,5000);
+})();
 
 // ── + agent button (VS Code only) ───────────────────────────────────────
 const spawnBtn=document.getElementById("spawn");
